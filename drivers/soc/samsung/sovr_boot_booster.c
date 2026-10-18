@@ -10,6 +10,7 @@ extern int dirty_background_ratio;
 extern unsigned int dirty_expire_interval;
 extern unsigned int dirty_writeback_interval;
 extern unsigned int sysctl_sched_nr_migrate;
+extern unsigned int sysctl_sched_migration_cost;
 /*
  * SOVR Kernel Boot Booster
  * High-performance early boot acceleration for Exynos 9610 (Samsung Galaxy A50)
@@ -47,7 +48,7 @@ extern unsigned int sysctl_sched_nr_migrate;
 #define SOVR_BOOT_MIF_FREQ           1352000 /* LPDDR4x Memory bus: 1.35 GHz */
 #define SOVR_BOOT_INT_FREQ            667000 /* Internal AXI/NoC Bus: 667 MHz */
 #define SOVR_BOOT_READ_AHEAD_KB      2048
-#define SOVR_RESTORE_READ_AHEAD_KB   512
+#define SOVR_RESTORE_READ_AHEAD_KB   128
 
 static bool booster_active = false;
 static unsigned int booster_timeout_secs = SOVR_DEFAULT_TIMEOUT_SECS;
@@ -175,6 +176,7 @@ void sovr_boot_boost_finish(void)
 	dirty_expire_interval = 3000;
 	dirty_writeback_interval = 3000;
 	sysctl_sched_nr_migrate = 20;
+	sysctl_sched_migration_cost = 500000;
 
 	pr_info("Boot completed: Acceleration DEACTIVATED cleanly. CPU governed dynamically, I/O set to %u KB ra, ZRAM swappiness=160/70, dirty=15/5, writeback=3000.\n",
 		SOVR_RESTORE_READ_AHEAD_KB);
