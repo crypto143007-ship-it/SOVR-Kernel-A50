@@ -43,7 +43,7 @@ CURRENT_BUILD_USER=$(whoami)
 
 # Toolchain options
 BUILD_PREF_COMPILER='clang'
-BUILD_PREF_COMPILER_VERSION='aosp_17'
+BUILD_PREF_COMPILER_VERSION='neutron'
 
 # Local toolchain directory
 TOOLCHAIN=$HOME/toolchains/exynos9610_toolchains_fresh
@@ -76,7 +76,17 @@ verify_toolchain() {
 	sleep 2
 	script_echo " "
 
-	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'clang_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_15' ]]; then
+	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'neutron' ]]; then
+		AOSP_CLANG="$HOME/toolchains/neutron-clang"
+		if [[ -d "${AOSP_CLANG}" ]]; then
+			script_echo "I: Using Neutron Clang (LLVM 22+) toolchain from ${AOSP_CLANG}"
+			export PATH="${AOSP_CLANG}/bin:${TOOLCHAIN_EXT}/bin:$PATH"
+			export LD_LIBRARY_PATH="${AOSP_CLANG}/lib:${AOSP_CLANG}/lib64:${TOOLCHAIN_EXT}/lib:$LD_LIBRARY_PATH"
+		else
+			script_echo "E: Neutron Clang not found at ${AOSP_CLANG}!"
+			exit_script
+		fi
+	elif [[ ${BUILD_PREF_COMPILER_VERSION} == 'clang_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_15' ]]; then
 		AOSP_CLANG="$HOME/toolchains/clang-15"
 		if [[ -d "${AOSP_CLANG}" ]]; then
 			script_echo "I: Using Clang 15 toolchain from ${AOSP_CLANG}"
@@ -253,7 +263,7 @@ build_kernel() {
 	script_echo " "
 	BUILD_JOBS=${BUILD_JOBS:-$(nproc --all)}
 
-	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'clang_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_14' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_17' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp' ]]; then
+	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'neutron' || ${BUILD_PREF_COMPILER_VERSION} == 'clang_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_14' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_17' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp' ]]; then
 		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
 		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
 	elif [[ ${BUILD_PREF_COMPILER_VERSION} == 'rui' ]]; then
@@ -377,7 +387,7 @@ if [[ ! -z ${BUILD_KERNEL_BRANCH} ]]; then
 		fi
 	fi
 else
-	SOVR_VERSION="v4.0"
+	SOVR_VERSION="v4.1-beta1"
 	if [[ ${BUILD_KERNEL_KSU} == 'true' ]]; then
 		FILE_OUTPUT=SOVR-Kernel-${SOVR_VERSION}.A${BUILD_ANDROID_PLATFORM}_${FILE_KERNEL_CODE}${ZIP_ONEUI_VERSION}_${BUILD_DEVICE_NAME^}_KSU.zip
 		LOCALVERSION=" - SOVR-${SOVR_VERSION}-KSU"
@@ -517,7 +527,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -t|--toolchain)
-      BUILD_PREF_COMPILER_VERSION='aosp_17'
+      BUILD_PREF_COMPILER_VERSION="${2:-neutron}"
       shift; shift
       ;;
     -h|--help)

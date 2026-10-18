@@ -1,5 +1,15 @@
-extern int sysctl_vfs_cache_pressure;
 /* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * External VM and scheduler tunables linked statically in vmlinux
+ */
+extern int sysctl_vfs_cache_pressure;
+extern int vm_swappiness;
+extern int direct_vm_swappiness;
+extern int vm_dirty_ratio;
+extern int dirty_background_ratio;
+extern unsigned int dirty_expire_interval;
+extern unsigned int dirty_writeback_interval;
+extern unsigned int sysctl_sched_nr_migrate;
 /*
  * SOVR Kernel Boot Booster
  * High-performance early boot acceleration for Exynos 9610 (Samsung Galaxy A50)
@@ -154,10 +164,19 @@ void sovr_boot_boost_finish(void)
 	/* Restore balanced I/O read-ahead for runtime memory efficiency */
 	sovr_apply_read_ahead_kb(SOVR_RESTORE_READ_AHEAD_KB);
 
-	/* Pin VFS cache pressure to 75 to keep directory/inode caches in RAM */
-	sysctl_vfs_cache_pressure = 75;
+	/* Pin VFS cache pressure to 60 to keep directory/inode caches in RAM */
+	sysctl_vfs_cache_pressure = 60;
 
-	pr_info("Boot completed: Acceleration DEACTIVATED cleanly. CPU governed dynamically, I/O set to %u KB ra.\n",
+	/* Apply SOVR v4.1 runtime VM & memory optimizations */
+	vm_swappiness = 160;
+	direct_vm_swappiness = 70;
+	vm_dirty_ratio = 15;
+	dirty_background_ratio = 5;
+	dirty_expire_interval = 3000;
+	dirty_writeback_interval = 3000;
+	sysctl_sched_nr_migrate = 20;
+
+	pr_info("Boot completed: Acceleration DEACTIVATED cleanly. CPU governed dynamically, I/O set to %u KB ra, ZRAM swappiness=160/70, dirty=15/5, writeback=3000.\n",
 		SOVR_RESTORE_READ_AHEAD_KB);
 
 	mutex_unlock(&booster_lock);
