@@ -387,7 +387,7 @@ if [[ ! -z ${BUILD_KERNEL_BRANCH} ]]; then
 		fi
 	fi
 else
-	SOVR_VERSION="v4.1-beta1"
+	SOVR_VERSION="v4.1-beta2"
 	if [[ ${BUILD_KERNEL_KSU} == 'true' ]]; then
 		FILE_OUTPUT=SOVR-Kernel-${SOVR_VERSION}.A${BUILD_ANDROID_PLATFORM}_${FILE_KERNEL_CODE}${ZIP_ONEUI_VERSION}_${BUILD_DEVICE_NAME^}_KSU.zip
 		LOCALVERSION=" - SOVR-${SOVR_VERSION}-KSU"
@@ -639,6 +639,9 @@ if [[ ${BUILD_KERNEL_CI} == 'true' ]]; then
 
 	script_echo " "
 	script_echo "I: Beep boop! CI build!"
+else
+	export KBUILD_BUILD_USER="rui"
+	export KBUILD_BUILD_HOST="sovr-tech"
 fi
 
 if [[ ${BUILD_KERNEL_DIRTY} == 'true' ]]; then
