@@ -323,6 +323,13 @@ int sched_policy_get(struct task_struct *p)
 	if (kpp_status(cgroup_idx))
 		return SCHED_POLICY_SEMI_PERF;
 
+	/* SOVR Kernel v4.1 Tuning:
+	 * Foreground interactive tasks (CGROUP_TOPAPP) must ALWAYS run under SCHED_POLICY_PERF.
+	 * Overrides any userspace ROM scripts that attempt to choke top-app into SCHED_POLICY_EFF.
+	 */
+	if (cgroup_idx == CGROUP_TOPAPP)
+		return SCHED_POLICY_PERF;
+
 	/*
 	 * Change target tasks' policy to SCHED_POLICY_ENERGY
 	 * for power optimization, if
