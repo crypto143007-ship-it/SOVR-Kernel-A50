@@ -123,11 +123,15 @@ static __ref int tz_deploy_handler(void *arg)
 		goto out_sock;
 	}
 
-	if (reply.base.result)
-		panic("tzdev: iwsock error. result=%d\n", reply.base.result);
+	if (reply.base.result) {
+		tzdev_print(0, "tzdev: startup.tzar deploy rejected/already loaded (result=%d), skipping safely\n", reply.base.result);
+		goto out_sock;
+	}
 
-	if (reply.base.base.cmd != CMD_STARTUP_LOADER_REPLY_UPLOAD_CONTAINER)
-		panic("tzdev: iwsock wrong cmd. cmd=%u\n", reply.base.base.cmd);
+	if (reply.base.base.cmd != CMD_STARTUP_LOADER_REPLY_UPLOAD_CONTAINER) {
+		tzdev_print(0, "tzdev: iwsock wrong cmd (%u), skipping safely\n", reply.base.base.cmd);
+		goto out_sock;
+	}
 
 	ret = 0;
 	tzdev_print(0, "[debug] Startuploader complete\n");
