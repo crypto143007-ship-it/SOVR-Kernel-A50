@@ -718,10 +718,15 @@ else
 	merge_config non-root
 fi
 
-# Use no-product Exynos DTB when building AOSP
+# Use appropriate DTB when building AOSP or One UI 14
 if [[ ${BUILD_KERNEL_CODE} == "aosp" ]]; then
-	script_echo "I: Copying no-product DTB file for use with AOSP ROMs."
-	cp -f $(pwd)/arch/arm64/boot/dts/exynos/aosp/exynos9610.dts $(pwd)/arch/arm64/boot/dts/exynos/
+	if [[ ${BUILD_ANDROID_PLATFORM} -ge 14 ]]; then
+		script_echo "I: Copying Android 14 EROFS DTB file for use with AOSP on Android 14 base (Fresh 6)."
+		cp -f $(pwd)/arch/arm64/boot/dts/exynos/oneui14/exynos9610.dts $(pwd)/arch/arm64/boot/dts/exynos/
+	else
+		script_echo "I: Copying no-product DTB file for use with legacy AOSP ROMs."
+		cp -f $(pwd)/arch/arm64/boot/dts/exynos/aosp/exynos9610.dts $(pwd)/arch/arm64/boot/dts/exynos/
+	fi
 elif [[ ${BUILD_ANDROID_PLATFORM} -ge 14 ]] && [[ ${BUILD_KERNEL_CODE} == "oneui" ]]; then
 	script_echo "I: Copying One UI 14 EROFS DTB file for use with Fresh 6 / One UI 6."
 	cp -f $(pwd)/arch/arm64/boot/dts/exynos/oneui14/exynos9610.dts $(pwd)/arch/arm64/boot/dts/exynos/
