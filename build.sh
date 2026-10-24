@@ -387,7 +387,7 @@ if [[ ! -z ${BUILD_KERNEL_BRANCH} ]]; then
 		fi
 	fi
 else
-	SOVR_VERSION="v4.1-beta4"
+	SOVR_VERSION="v4.1"
 	if [[ ${BUILD_KERNEL_KSU} == 'true' ]]; then
 		FILE_OUTPUT=SOVR-Kernel-${SOVR_VERSION}.A${BUILD_ANDROID_PLATFORM}_${FILE_KERNEL_CODE}${ZIP_ONEUI_VERSION}_${BUILD_DEVICE_NAME^}_KSU.zip
 		LOCALVERSION=" - SOVR-${SOVR_VERSION}-KSU"
@@ -722,7 +722,7 @@ fi
 if [[ ${BUILD_KERNEL_CODE} == "aosp" ]]; then
 	if [[ ${BUILD_ANDROID_PLATFORM} -ge 14 ]]; then
 		script_echo "I: Copying Android 14 EROFS DTB file for use with AOSP on Android 14 base (Fresh 6)."
-		cp -f $(pwd)/arch/arm64/boot/dts/exynos/oneui14/exynos9610.dts $(pwd)/arch/arm64/boot/dts/exynos/
+		cp -f $(pwd)/arch/arm64/boot/dts/exynos/aosp14/exynos9610.dts $(pwd)/arch/arm64/boot/dts/exynos/
 	else
 		script_echo "I: Copying no-product DTB file for use with legacy AOSP ROMs."
 		cp -f $(pwd)/arch/arm64/boot/dts/exynos/aosp/exynos9610.dts $(pwd)/arch/arm64/boot/dts/exynos/

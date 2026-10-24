@@ -1141,6 +1141,9 @@ void __init load_default_modules(void)
 static int run_init_process(const char *init_filename)
 {
 	argv_init[0] = init_filename;
+	if (!strcmp(init_filename, "/init") && !argv_init[1])
+		argv_init[1] = "selinux_setup";
+	pr_err("run_init_process: starting %s %s\n", argv_init[0], argv_init[1] ? argv_init[1] : "(null)");
 	return do_execve(getname_kernel(init_filename),
 		(const char __user *const __user *)argv_init,
 		(const char __user *const __user *)envp_init);

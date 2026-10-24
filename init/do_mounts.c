@@ -539,6 +539,23 @@ void __init mount_root(void)
 		if (err < 0)
 			pr_emerg("Failed to create /dev/root: %d\n", err);
 		mount_block_root("/dev/root", root_mountflags);
+
+		/* Early mount /vendor for AOSP / GSI (Android 13/14+) */
+		{
+			dev_t vdev = MKDEV(MAJOR(ROOT_DEV), MINOR(ROOT_DEV) + 1);
+			int err = create_dev("/dev/vendor", vdev);
+			if (!err) {
+				sys_mkdir("vendor", 0755);
+				err = sys_mount("/dev/vendor", "vendor", "erofs", MS_RDONLY, NULL);
+				if (err < 0)
+					err = sys_mount("/dev/vendor", "vendor", "ext4", MS_RDONLY, NULL);
+				pr_err("VFS: Early vendor mount on device %u:%u: result=%d\n",
+					MAJOR(vdev), MINOR(vdev), err);
+				sys_unlink("/dev/vendor");
+			} else {
+				pr_err("VFS: Failed to create /dev/vendor: %d\n", err);
+			}
+		}
 	}
 #endif
 }
@@ -602,6 +619,52 @@ out:
 	devtmpfs_mount("dev");
 	sys_mount(".", "/", NULL, MS_MOVE, NULL);
 	sys_chroot(".");
+
+	/* Early virtual filesystems for Android 10+ userspace */
+	sys_mkdir("/dev/selinux", 0755);
+	sys_mkdir("/dev/socket", 0755);
+	sys_mkdir("/dev/dm-user", 0755);
+	sys_mkdir("/dev/block", 0755);
+	sys_mkdir("/dev/sys", 0755);
+	sys_mkdir("/dev/sys/block", 0755);
+	sys_mkdir("/dev/sys/fs", 0755);
+
+	sys_mkdir("/proc", 0755);
+	pr_err("VFS: Mount proc: %ld\n", sys_mount("proc", "/proc", "proc", 0, NULL));
+	sys_mkdir("/sys", 0755);
+	pr_err("VFS: Mount sysfs: %ld\n", sys_mount("sysfs", "/sys", "sysfs", 0, NULL));
+	sys_mkdir("/sys/fs", 0755);
+	sys_mkdir("/sys/fs/selinux", 0755);
+	pr_err("VFS: Mount selinuxfs: %ld\n", sys_mount("selinuxfs", "/sys/fs/selinux", "selinuxfs", 0, NULL));
+	sys_mkdir("/dev/pts", 0755);
+	pr_err("VFS: Mount devpts: %ld\n", sys_mount("devpts", "/dev/pts", "devpts", 0, NULL));
+
+	sys_mkdir("/mnt", 0755);
+	pr_err("VFS: Mount mnt: %ld\n",
+		sys_mount("tmpfs", "/mnt", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV, "mode=0755,uid=0,gid=1000"));
+	sys_mkdir("/mnt/vendor", 0755);
+	sys_mkdir("/mnt/vendor/efs", 0771);
+	sys_mkdir("/mnt/vendor/cpefs", 0771);
+	sys_mkdir("/mnt/vendor/persist", 0771);
+	sys_mkdir("/mnt/product", 0755);
+
+	sys_mkdir("/debug_ramdisk", 0755);
+	pr_err("VFS: Mount debug_ramdisk: %ld\n",
+		sys_mount("tmpfs", "/debug_ramdisk", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV, "mode=0755,uid=0,gid=0"));
+
+	sys_mkdir("/second_stage_resources", 0755);
+	pr_err("VFS: Mount second_stage_resources: %ld\n",
+		sys_mount("tmpfs", "/second_stage_resources", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV, "mode=0755,uid=0,gid=0"));
+
+	if (sys_access("/vendor/etc/selinux/plat_sepolicy_vers.txt", 0) != 0) {
+		dev_t vdev = MKDEV(MAJOR(ROOT_DEV), MINOR(ROOT_DEV) + 1);
+		create_dev("/dev/vendor_late", vdev);
+		pr_err("VFS: Late vendor mount (erofs): %ld\n",
+			sys_mount("/dev/vendor_late", "/vendor", "erofs", MS_RDONLY, NULL) < 0 ? sys_mount("/dev/vendor_late", "/vendor", "ext4", MS_RDONLY, NULL) : 0);
+		sys_unlink("/dev/vendor_late");
+	}
+	pr_err("VFS: Vendor plat_sepolicy_vers check: %ld\n",
+		sys_access("/vendor/etc/selinux/plat_sepolicy_vers.txt", 0));
 }
 
 static bool is_tmpfs;

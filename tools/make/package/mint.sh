@@ -125,6 +125,13 @@ else
 	append_file ${VENDOR_INIT_RC} 'swapon_all /vendor/etc/fstab.zram' init.zram.rc
 fi
 
+# Fix SELinux genfscon conflict on LineageOS / AOSP GSIs with Samsung vendor
+for f in /system_root/system/system_ext/etc/selinux/system_ext_sepolicy.cil /system/system_ext/etc/selinux/system_ext_sepolicy.cil; do
+	if [ -f "$f" ]; then
+		sed -i -e '/genfscon iso9660/d' -e '/genfscon udf/d' "$f"
+	fi
+done
+
 umount /system
 umount /system_root
 umount /vendor

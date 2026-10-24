@@ -961,7 +961,7 @@ tunables_init:
 	}
 
 	ag_policy->be_stochastic = false;
-	tunables->iowait_boost_enable = policy->iowait_boost_enable;
+	tunables->iowait_boost_enable = true;
 
 	policy->governor_data = ag_policy;
 	ag_policy->tunables = tunables;
