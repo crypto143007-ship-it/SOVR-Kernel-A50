@@ -34,6 +34,7 @@ mount /system/
 mount /system_root/
 mount /vendor/
 mount -o rw,remount -t auto /system > /dev/null
+mount -o rw,remount -t auto /system_root > /dev/null
 mount -o rw,remount -t auto /vendor > /dev/null
 
 fresh4=0
