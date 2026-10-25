@@ -95,17 +95,17 @@ if [ ! -z "$oneui" ] || [ ! -z "$fresh" ]; then
 	elif [ "${sdk_ver}" == "34" ] || [ "${sdk_ver}" == "35" ]; then
 		ui_print "  - One UI 6+ / Fresh 6 detected (Android 14+)!"
 		ui_print "    - Installing SOVR performance profile (Zest)..."
-		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system/etc/init/init.fresh.perf.rc
-		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system_root/system/etc/init/init.fresh.perf.rc
-		chmod 644 /system/etc/init/init.fresh.perf.rc
-		chmod 644 /system_root/system/etc/init/init.fresh.perf.rc
+		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system/etc/init/init.fresh.perf.rc 2>/dev/null || true
+		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system_root/system/etc/init/init.fresh.perf.rc 2>/dev/null || true
+		chmod 644 /system/etc/init/init.fresh.perf.rc 2>/dev/null || true
+		chmod 644 /system_root/system/etc/init/init.fresh.perf.rc 2>/dev/null || true
 	else
 		ui_print "  - One UI 4/5 / Fresh 4/5 detected (Android 12/13)!"
 		ui_print "    - Installing SOVR performance profile (Zest)..."
-		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system/etc/init/init.fresh.perf.rc
-		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system_root/system/etc/init/init.fresh.perf.rc
-		chmod 644 /system/etc/init/init.fresh.perf.rc
-		chmod 644 /system_root/system/etc/init/init.fresh.perf.rc
+		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system/etc/init/init.fresh.perf.rc 2>/dev/null || true
+		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system_root/system/etc/init/init.fresh.perf.rc 2>/dev/null || true
+		chmod 644 /system/etc/init/init.fresh.perf.rc 2>/dev/null || true
+		chmod 644 /system_root/system/etc/init/init.fresh.perf.rc 2>/dev/null || true
 	fi
 else
 	ui_print "  - AOSP ROM detected!"
