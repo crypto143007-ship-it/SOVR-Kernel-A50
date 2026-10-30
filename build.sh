@@ -1,4 +1,6 @@
 #!/bin/bash
+set -eo pipefail
+
 # =========================================
 #         _____              _      
 #        |  ___| __ ___  ___| |__   
@@ -277,6 +279,11 @@ build_kernel() {
 
 build_image() {
 	if [[ -e "$(pwd)/arch/arm64/boot/Image" ]]; then
+		SELINUX_MODE=enforcing
+		if [[ ${BUILD_KERNEL_PERMISSIVE} == 'true' || ${BUILD_KERNEL_CODE} == 'aosp' ]]; then
+			SELINUX_MODE=permissive
+		fi
+
 		script_echo " "
 		script_echo "I: Building kernel image..."
 		script_echo "    Header/Page size: ${DEVICE_KERNEL_HEADER}/${DEVICE_KERNEL_PAGESIZE}"
@@ -287,7 +294,7 @@ build_image() {
 
 		${ORIGIN_DIR}/tools/make/bin/mkbootimg \
 				  --kernel $(pwd)/arch/arm64/boot/Image \
-				  --cmdline "androidboot.selinux=permissive androidboot.selinux=permissive loop.max_part=7" --board "$DEVICE_KERNEL_BOARD" \
+				  --cmdline "androidboot.selinux=${SELINUX_MODE} loop.max_part=7" --board "$DEVICE_KERNEL_BOARD" \
 				  --base $DEVICE_KERNEL_BASE --pagesize $DEVICE_KERNEL_PAGESIZE \
 				  --kernel_offset $DEVICE_KERNEL_OFFSET --ramdisk_offset $DEVICE_RAMDISK_OFFSET \
 				  --second_offset $DEVICE_SECOND_OFFSET --tags_offset $DEVICE_TAGS_OFFSET \
