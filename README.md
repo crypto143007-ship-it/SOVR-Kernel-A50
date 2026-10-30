@@ -14,7 +14,7 @@
   <a href="https://github.com/KernelSU-Next/KernelSU-Next"><img src="https://img.shields.io/badge/Root-KernelSU--Next_v3.4.2-1f2328.svg" alt="Root"></a>
   <a href="https://gitlab.com/simonpunk/susfs4ksu"><img src="https://img.shields.io/badge/Security-SuSFS_v1.5.5-1f2328.svg" alt="SuSFS"></a>
   <a href="https://docs.kernel.org/admin-guide/mm/multigen_lru.html"><img src="https://img.shields.io/badge/MM-Multi--Gen_LRU-1f2328.svg" alt="MGLRU"></a>
-  <img src="https://img.shields.io/badge/ZRAM-ZSTD_Multi--Stream-1f2328.svg" alt="ZRAM">
+  <img src="https://img.shields.io/badge/ZRAM-LZ4_default%2C_ZSTD_available-1f2328.svg" alt="ZRAM">
   <img src="https://img.shields.io/badge/TCP-Google_BBR-1f2328.svg" alt="TCP BBR">
 </p>
 
@@ -28,15 +28,17 @@ Transitioned from Samsung's legacy baseline to **OpenELA Enterprise Linux LTS (4
 
 Tailored releases are provided for **Samsung One UI 4.1 (Android 12)**, **One UI 6+ (Android 14 / Fresh 6)**, and **Generic System Images (AOSP Android 12+)**.
 
+Feature descriptions below reflect the v4.0 project baseline unless explicitly marked as v4.1 development findings. Configuration alone does not establish runtime availability, performance, or ROM compatibility.
+
 ---
 
 ## Architectural Highlights
 
 ### ⚡ Silicon Unlock & Hardware Offloading
-* **ARMv8 Hardware Cryptography:** Unlocks hardware execution units (`aes`, `pmull`, `sha1`, `sha2`, `crc32`, and `chacha20-neon`). Android File-Based Encryption (fscrypt / FBE), dm-crypt, and TLS packet hashing execute directly on CPU silicon.
+* **ARMv8 Hardware Cryptography:** The A50 core defconfig enables ARM64 AES/CE, GHASH/PMULL, SHA1/SHA2 CE, CRC32 CE, and ChaCha20 NEON implementations. Runtime driver selection and throughput still require on-device validation.
 * **SCSC Wi-Fi Acceleration:** Enables NAPI ring-buffer polling, Generic Receive Offload (GRO), and Low Latency mode on the SCSC Wi-Fi subsystem, minimizing CPU interrupt overhead during high-speed transfers.
 * **LPDDR4x & System Bus QoS Boost:** Enforces 1.35 GHz on the LPDDR4x Memory Interface (MIF) and 667 MHz on the Internal Bus (INT) during boot and intensive workload phases.
-* **Cortex-A73 Pipeline Optimization:** Built with `-march=armv8-a+crypto+crc+sha2+aes -mtune=cortex-a73 -mcpu=cortex-a73+crypto+crc+sha2+aes` for optimal instruction scheduling on out-of-order execution pipelines.
+* **ARM64 Compiler Targeting:** Architecture flags are defined in both the ARM64 and top-level Makefiles, including A73 and A53 tuning. The final compiler command line and instruction compatibility across both clusters must be verified from a build before making performance claims.
 
 ### 📁 File Systems & Storage Architecture
 * **Native EROFS Backport:** In-kernel Enhanced Read-Only File System with ARMv8 NEON assembly decompression (`lz4armv8.S`), SELinux xattrs, and POSIX ACL support for modern Android 13/14 system images.
@@ -54,14 +56,14 @@ Tailored releases are provided for **Samsung One UI 4.1 (Android 12)**, **One UI
 
 ### 🧠 Memory Management & Interactive Responsiveness
 * **Multi-Gen LRU (MGLRU):** Backported 12-patch series replacing the legacy 2-list LRU algorithm. Employs multi-generational page tracking to cut memory thrashing and background app redraws.
-* **ZRAM with Zstandard (ZSTD):** Multi-stream swap compression engine achieving an average ~3.87:1 ratio with sub-millisecond decompression latency.
+* **ZRAM:** LZ4 is the default compressor; Zstandard (ZSTD) remains enabled as an alternative. Compression ratios, latency, CPU overhead, and battery impact have not yet been benchmarked on an A50.
 * **Touch Event Frequency Boosting:** In-kernel touch floor setting 1.53 GHz (A73) and 1.14 GHz (A53) for 130 ms upon touch interactions for instant UI response.
 * **Accelerated Energy Adaptive Governor:** 100 µs (BIG) and 250 µs (LITTLE) ramp-up limits with 2000 µs down-scaling for smooth 60 FPS delivery.
 * **In-Kernel Boot Booster:** Locks clusters and raises block readahead to 2048 KB during early boot until `sys.boot_completed=1`.
 
 ### 🌐 Connectivity & Networking
 * **Google BBR:** Default TCP congestion control algorithm prioritizing bottleneck bandwidth and minimal latency.
-* **Bufferbloat Mitigation:** Integrated FQ-PIE and CAKE queue disciplines for Wi-Fi and LTE.
+* **Bufferbloat Mitigation:** CAKE and FQ_CODEL are configured. FQ-PIE is not present in the current branch's scheduler Kconfig/Makefile and is not advertised as available.
 * **Multi-Ecosystem Adaptation:** Dual-interface SCSC networking for One UI and upstream `wlan1` routing for pure AOSP.
 
 ---
@@ -74,13 +76,13 @@ Tailored releases are provided for **Samsung One UI 4.1 (Android 12)**, **One UI
 | **Target Device** | Samsung Galaxy A50 (`SM-A505F`, `SM-A505FN`, `SM-A505G`, `SM-A505N`) |
 | **SoC Architecture** | Samsung Exynos 9610 (10nm FinFET) |
 | **CPU Configuration** | 4x Cortex-A73 @ 2.3 GHz + 4x Cortex-A53 @ 1.7 GHz (ARMv8.0-A) |
-| **GPU** | ARM Mali-G72 MP3 (Bifrost R32P0 / R38P1 DDK) |
+| **GPU** | ARM Mali-G72 MP3; build fragments select Bifrost R32P1 (Android 12) or R38P1 (Android 14), not yet device-validated |
 | **Toolchain** | Google AOSP Clang 17.0.2 (`clang-r487747c`) + LLD 17.0.2 |
-| **Optimization Target** | `-march=armv8-a+crypto+crc+sha2+aes -mtune=cortex-a73` |
+| **Optimization Target** | ARM64 crypto/CRC/SHA2 flags and heterogeneous A73/A53 tuning; effective build flags require log verification |
 | **Kernel Preemption** | `CONFIG_PREEMPT=y` |
 | **Root Subsystem** | KernelSU-Next v3.4.2 (UAPI v5, Code 33355) |
 | **VFS Hiding** | SuSFS v1.5.5 non-GKI |
-| **SELinux Mode** | Enforcing (Default & Verified) |
+| **SELinux Mode** | One UI configuration selects always-enforce; AOSP configuration selects always-permit. Runtime mode has not been verified on-device. |
 
 ---
 
