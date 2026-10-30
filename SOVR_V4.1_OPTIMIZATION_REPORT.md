@@ -16,7 +16,7 @@ The following are source/configuration observations only. They do not prove runt
 | Networking | BBR, CAKE, and FQ_CODEL are configured. The checked-in `net/sched/Kconfig` and `Makefile` have no FQ-PIE entry. | Runtime qdisc/congestion availability and network measurements not tested. |
 | Samsung connectivity | Core config enables SCSC Wi-Fi NAPI/GRO and low-latency mode; the default defconfig differs on NAPI. | Firmware, Wi-Fi, Bluetooth, mobile data, and tethering not tested. |
 | USB Ethernet | RTL8152, AX88179, and CDC Ethernet are configured in the A50 config. | Devices not tested. |
-| Filesystems | F2FS, EROFS with ARMv8 accelerated LZ4, and OverlayFS are configured. | Mount, encryption, recovery, and EROFS/ZRAM interactions not tested. |
+| Filesystems | F2FS, EROFS with ARMv8 accelerated LZ4, and OverlayFS are configured. AOSP package ZRAM writeback now checks the vendor filesystem and skips EROFS or unknown results. | Mount, encryption, recovery, and installer behavior not tested on a device. |
 | Compiler | Clang 17/LLD, ThinLTO, and Polly are configured/documented. Full LTO remains experimental/unverified. The top-level and ARM64 Makefiles contain both A53 and A73 CPU-tuning options. | Effective compiler flags, Polly invocation, and reproducible comparison builds not verified. |
 | GPU | Build fragments select R32P1 for Android 12 and R38P1 for Android 14. | Driver build, display, camera, video, gaming, and suspend/resume not tested. |
 | SELinux | One UI fragment selects `CONFIG_ALWAYS_ENFORCE`; AOSP selects `CONFIG_ALWAYS_PERMIT`. The boot argument was hard-coded to permissive for every profile and is corrected here to match the selected profile. | Runtime enforcement and policy compatibility not tested. |
@@ -27,7 +27,7 @@ The following are source/configuration observations only. They do not prove runt
 
 ## Safe changes made
 
-The LZ4 default change preserves ZSTD support and does not remove compressor code. The build-script change aligns artifacts with the selected SELinux profile and fails early on unsuccessful build commands. The existing development workflow now runs on pushes to this branch with read-only repository permissions. No clock, voltage, thermal, storage-integrity, or hardware-driver behavior was altered.
+The LZ4 default change preserves ZSTD support and does not remove compressor code. The EROFS-aware package guard preserves the existing non-EROFS AOSP writeback path while skipping it when EROFS is detected or filesystem identification fails. The build-script change aligns artifacts with the selected SELinux profile and fails early on unsuccessful build commands. The existing development workflow now runs on pushes to this branch with read-only repository permissions. No clock, voltage, thermal, storage-integrity, or hardware-driver behavior was altered.
 
 ## Outstanding acceptance work
 
