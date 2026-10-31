@@ -2,6 +2,8 @@
 set -euo pipefail
 
 config_file="${1:?Usage: validate-kernel-artifacts.sh <config-file>}"
+expected_package="${2:-}"
+expected_root_type="${3:-}"
 job_id="${GITHUB_JOB:?GITHUB_JOB must be set by GitHub Actions}"
 release_dir=release
 boot_image=tools/make/boot.img
@@ -18,7 +20,11 @@ if [[ ! -s "$boot_image" ]]; then
 fi
 
 shopt -s nullglob
-packages=("$release_dir"/*.zip)
+if [[ -n "$expected_package" ]]; then
+	packages=("$release_dir/$expected_package")
+else
+	packages=("$release_dir"/*.zip)
+fi
 if (( ${#packages[@]} == 0 )); then
 	echo "::error::No flashable kernel ZIP was produced in $release_dir."
 	exit 1
@@ -38,6 +44,23 @@ for package in "${packages[@]}"; do
 	if ! unzip -Z1 "$package" | grep -Eq '(^|/)dtb\.img$'; then
 		echo "::error::Expected device-tree image is missing from package: $package"
 		exit 1
+	fi
+
+	if [[ -n "$expected_package" || -n "$expected_root_type" ]]; then
+		manifest="$(unzip -p "$package" mint.prop 2>/dev/null)" || {
+			echo "::error::Package manifest is missing: $package"
+			exit 1
+		}
+		if [[ -n "$expected_package" ]] &&
+			! printf '%s\n' "$manifest" | grep -Fqx "ro.mint.build.package=${expected_package%.zip}"; then
+			echo "::error::Package manifest name does not match $expected_package."
+			exit 1
+		fi
+		if [[ -n "$expected_root_type" ]] &&
+			! printf '%s\n' "$manifest" | grep -Fqx "ro.mint.build.root=$expected_root_type"; then
+			echo "::error::Package root integration does not match $expected_root_type."
+			exit 1
+		fi
 	fi
 done
 

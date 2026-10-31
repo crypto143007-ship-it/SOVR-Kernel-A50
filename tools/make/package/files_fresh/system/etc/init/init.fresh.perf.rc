@@ -48,6 +48,15 @@ on init
     chmod 0644 /sys/devices/system/cpu/cpufreq/policy4/energy_adaptive/down_rate_limit_us
 
 on property:sys.boot_completed=1
+    # SOVR TCP Network Tuning (BBR buffer & latency optimization)
+    write /proc/sys/net/core/rmem_max 16777216
+    write /proc/sys/net/core/wmem_max 8388608
+    write /proc/sys/net/ipv4/tcp_rmem "4096 87380 16777216"
+    write /proc/sys/net/ipv4/tcp_wmem "4096 65536 8388608"
+    write /proc/sys/net/ipv4/tcp_notsent_lowat 16384
+    write /proc/sys/net/ipv4/tcp_fastopen 3
+    write /proc/sys/net/ipv4/tcp_tw_reuse 1
+
     write /sys/kernel/sovr_boot_booster/active 0
     # Fresh Performance Kit version
     setprop persist.sys.zest.perf_version 14.2.5.2

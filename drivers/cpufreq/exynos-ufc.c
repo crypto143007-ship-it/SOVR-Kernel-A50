@@ -107,9 +107,6 @@ static ssize_t store_cpufreq_min_limit(struct kobject *kobj,
 	struct exynos_cpufreq_domain *domain;
 	int input, scale = -1;
 	unsigned int freq;
-	unsigned int req_limit_freq;
-	bool set_max = false;
-	bool set_limit = false;
 	int index = 0;
 	struct cpumask mask;
 
@@ -122,6 +119,10 @@ static ssize_t store_cpufreq_min_limit(struct kobject *kobj,
 	}
 
 	list_for_each_entry_reverse(domain, domains, list) {
+		unsigned int req_limit_freq = 0;
+		bool set_max = false;
+		bool set_limit = false;
+
 		struct exynos_ufc *ufc, *r_ufc;
 		struct cpufreq_policy *policy = NULL;
 
@@ -212,9 +213,6 @@ static ssize_t store_cpufreq_min_limit_wo_boost(struct kobject *kobj,
 	struct exynos_cpufreq_domain *domain;
 	int input, scale = -1;
 	unsigned int freq;
-	unsigned int req_limit_freq;
-	bool set_max = false;
-	bool set_limit = false;
 	int index = 0;
 	struct cpumask mask;
 
@@ -227,6 +225,10 @@ static ssize_t store_cpufreq_min_limit_wo_boost(struct kobject *kobj,
 	}
 
 	list_for_each_entry_reverse(domain, domains, list) {
+		unsigned int req_limit_freq = 0;
+		bool set_max = false;
+		bool set_limit = false;
+
 		struct exynos_ufc *ufc, *r_ufc;
 		struct cpufreq_policy *policy = NULL;
 
@@ -376,9 +378,6 @@ static ssize_t store_cpufreq_max_limit(struct kobject *kobj, struct kobj_attribu
 	struct exynos_cpufreq_domain *domain;
 	int input, scale = -1;
 	unsigned int freq;
-	bool set_max = false;
-	unsigned int req_limit_freq;
-	bool set_limit = false;
 	int index = 0;
 	struct cpumask mask;
 
@@ -386,6 +385,10 @@ static ssize_t store_cpufreq_max_limit(struct kobject *kobj, struct kobj_attribu
 		return -EINVAL;
 
 	list_for_each_entry_reverse(domain, domains, list) {
+		unsigned int req_limit_freq = 0;
+		bool set_max = false;
+		bool set_limit = false;
+
 		struct exynos_ufc *ufc, *r_ufc;
 		struct cpufreq_policy *policy = NULL;
 

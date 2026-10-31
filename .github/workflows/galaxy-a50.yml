@@ -48,7 +48,7 @@ jobs:
       run: |
           set -eo pipefail
           echo "  I: Building Mint kernel ${GITHUB_REF##*/}-${GITHUB_RUN_NUMBER}"
-          ./build.sh --magisk --automated --device a50 --variant oneui --android 12
+          ./build.sh --magisk --automated --device a50 --variant oneui --android 12 --toolchain aosp_17
 
     - name: Prepare release package
       run: |
@@ -123,7 +123,7 @@ jobs:
       run: |
           set -eo pipefail
           echo "  I: Building Mint kernel ${GITHUB_REF##*/}-${GITHUB_RUN_NUMBER}"
-          ./build.sh --automated --device a50 --variant oneui --android 12
+          ./build.sh --automated --device a50 --variant oneui --android 12 --toolchain aosp_17
 
     - name: Prepare release package
       run: |
@@ -183,7 +183,7 @@ jobs:
       run: |
           set -eo pipefail
           echo "  I: Building Mint kernel ${GITHUB_REF##*/}-${GITHUB_RUN_NUMBER}"
-          ./build.sh --magisk --automated --device a50 --variant oneui --android 11
+          ./build.sh --magisk --automated --device a50 --variant oneui --android 11 --toolchain aosp_17
 
     - name: Prepare release package
       run: |
@@ -243,7 +243,7 @@ jobs:
       run: |
           set -eo pipefail
           echo "  I: Building Mint kernel ${GITHUB_REF##*/}-${GITHUB_RUN_NUMBER}"
-          ./build.sh --automated --device a50 --variant oneui --android 11
+          ./build.sh --automated --device a50 --variant oneui --android 11 --toolchain aosp_17
 
     - name: Prepare release package
       run: |
@@ -303,7 +303,7 @@ jobs:
       run: |
           set -eo pipefail
           echo "  I: Building Mint kernel ${GITHUB_REF##*/}-${GITHUB_RUN_NUMBER}"
-          ./build.sh --magisk --automated --device a50 --variant aosp --android 12
+          ./build.sh --magisk --automated --device a50 --variant aosp --android 12 --toolchain aosp_17
 
     - name: Prepare release package
       run: |
@@ -363,7 +363,7 @@ jobs:
       run: |
           set -eo pipefail
           echo "  I: Building Mint kernel ${GITHUB_REF##*/}-${GITHUB_RUN_NUMBER}"
-          ./build.sh --automated --device a50 --variant aosp --android 12
+          ./build.sh --automated --device a50 --variant aosp --android 12 --toolchain aosp_17
 
     - name: Prepare release package
       run: |
@@ -423,7 +423,7 @@ jobs:
       run: |
           set -eo pipefail
           echo "  I: Building Mint kernel ${GITHUB_REF##*/}-${GITHUB_RUN_NUMBER}"
-          ./build.sh --magisk --automated --device a50 --variant aosp --android 11
+          ./build.sh --magisk --automated --device a50 --variant aosp --android 11 --toolchain aosp_17
 
     - name: Prepare release package
       run: |
@@ -483,7 +483,7 @@ jobs:
       run: |
           set -eo pipefail
           echo "  I: Building Mint kernel ${GITHUB_REF##*/}-${GITHUB_RUN_NUMBER}"
-          ./build.sh --automated --device a50 --variant aosp --android 11
+          ./build.sh --automated --device a50 --variant aosp --android 11 --toolchain aosp_17
 
     - name: Prepare release package
       run: |

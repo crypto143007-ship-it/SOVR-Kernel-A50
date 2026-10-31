@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/kthread.h>
 #include <linux/mutex.h>
+#include <linux/string.h>
 #include <linux/vmalloc.h>
 #include <linux/wait.h>
 
@@ -26,13 +27,16 @@
 #include "tzlog.h"
 #include "teec/iw_messages.h"
 
+#define MAX_LOADING_ATTEMPTS 10
 #define MAX_CONNECTION_ATTEMPTS 20
 #define CONNECTION_ATTEMPT_TIMEOUT 100
 
 __asm__ (
   ".section .init.data,\"aw\"\n"
+  ".globl tzdev_tzar_begin\n"
   "tzdev_tzar_begin:\n"
   ".incbin \"drivers/misc/tzdev/startup.tzar\"\n"
+  ".globl tzdev_tzar_end\n"
   "tzdev_tzar_end:\n"
   ".previous\n"
 );
@@ -55,10 +59,14 @@ struct cmd_startup_loader_reply_upload_container {
 	struct cmd_reply base;
 } IW_STRUCTURE;
 
+static int tzar_deploy_result = -1;
+
 static __ref int tz_deploy_handler(void *arg)
 {
-	int ret;
-	size_t size;
+	int ret = -1;
+	int retry_cnt;
+	size_t tzar_size;
+	size_t reg_size;
 	struct sock_desc *sd;
 	struct cmd_startup_loader_upload_container command;
 	struct cmd_startup_loader_reply_upload_container reply;
@@ -66,80 +74,97 @@ static __ref int tz_deploy_handler(void *arg)
 	unsigned int attempt;
 	(void)arg;
 
-	size = tzdev_tzar_end - tzdev_tzar_begin;
-	tzdev_print(0, "[debug] tzar size = %zu\n", size);
+	tzar_size = tzdev_tzar_end - tzdev_tzar_begin;
+	reg_size = DIV_ROUND_UP(tzar_size, PAGE_SIZE) * PAGE_SIZE;
+	pr_info("tzdev: deploying startup.tzar (size=%zu, reg_size=%zu)\n", tzar_size, reg_size);
 
-	tzar = vmalloc(size);
-	if (!tzar) {
-		tzdev_print(0, "vmalloc fail\n");
-		return -ENOMEM;
-	}
+	for (retry_cnt = 0; retry_cnt < MAX_LOADING_ATTEMPTS; retry_cnt++) {
+		tzar = vzalloc(reg_size);
+		if (!tzar) {
+			pr_err("tzdev: vzalloc fail\n");
+			ret = -ENOMEM;
+			msleep(200);
+			continue;
+		}
 
-	memcpy(tzar, tzdev_tzar_begin, size);
+		memcpy(tzar, tzdev_tzar_begin, tzar_size);
 
-	size = DIV_ROUND_UP(size, PAGE_SIZE) * PAGE_SIZE;
-	ret = tzdev_mem_register(tzar, size, 0, NULL, NULL);
-	if (ret < 0) {
-		tzdev_print(0, "tzdev_mem_register fail, ret=%d\n", ret);
-		goto out_tzar;
-	}
+		ret = tzdev_mem_register(tzar, reg_size, 0, NULL, NULL);
+		if (ret < 0) {
+			pr_err("tzdev: tzdev_mem_register fail, ret=%d\n", ret);
+			vfree(tzar);
+			msleep(200);
+			continue;
+		}
 
-	command.base.cmd = CMD_STARTUP_LOADER_UPLOAD_CONTAINER;
-	command.buf_desc.id = ret;
-	command.buf_desc.size = (unsigned int)size;
+		memset(&command, 0, sizeof(command));
+		command.base.cmd = CMD_STARTUP_LOADER_UPLOAD_CONTAINER;
+		command.buf_desc.id = (uint32_t)ret;
+		command.buf_desc.offset = 0;
+		command.buf_desc.size = (uint32_t)reg_size;
 
-	sd = tz_iwsock_socket(1);
-	if (IS_ERR(sd)) {
-		ret = PTR_ERR(sd);
-		tzdev_print(0, "tz_iwsock_socket fail, ret=%d\n", ret);
-		goto out_mem;
-	}
+		sd = tz_iwsock_socket(1);
+		if (IS_ERR(sd)) {
+			ret = PTR_ERR(sd);
+			pr_err("tzdev: tz_iwsock_socket fail, ret=%d\n", ret);
+			tzdev_mem_release(command.buf_desc.id);
+			vfree(tzar);
+			msleep(200);
+			continue;
+		}
 
-	for (attempt = 0; attempt < MAX_CONNECTION_ATTEMPTS; attempt++) {
-		ret = tz_iwsock_connect(sd, STARTUP_LOADER_SOCK, 0);
-		if (!ret)
-			break;
+		for (attempt = 0; attempt < MAX_CONNECTION_ATTEMPTS; attempt++) {
+			ret = tz_iwsock_connect(sd, STARTUP_LOADER_SOCK, 0);
+			if (!ret)
+				break;
 
-		tzdev_print(0, "Failed to connect to startup loader socket, "
-			"error = %d, retrying...\n",
-			ret);
+			pr_info("tzdev: connecting to startup loader, attempt %u (ret=%d)...\n",
+				attempt, ret);
+			msleep(CONNECTION_ATTEMPT_TIMEOUT);
+		}
+		if (ret < 0) {
+			pr_err("tzdev: tz_iwsock_connect fail, ret=%d\n", ret);
+			goto out_sock;
+		}
 
-		msleep(CONNECTION_ATTEMPT_TIMEOUT);
-	}
-	if (ret < 0) {
-		tzdev_print(0, "tz_iwsock_connect fail, ret=%d\n", ret);
-		goto out_sock;
-	}
+		ret = tz_iwsock_write(sd, &command, sizeof(command), 0);
+		if (ret != sizeof(command)) {
+			pr_err("tzdev: tz_iwsock_write fail, ret=%d\n", ret);
+			goto out_sock;
+		}
 
-	ret = tz_iwsock_write(sd, &command, sizeof(command), 0);
-	if (ret != sizeof(command)) {
-		tzdev_print(0, "tz_iwsock_write fail, ret=%d\n", ret);
-		goto out_sock;
-	}
+		memset(&reply, 0, sizeof(reply));
+		ret = tz_iwsock_read(sd, &reply, sizeof(reply), 0);
+		if (ret < 0 || reply.base.result != 0) {
+			pr_err("tzdev: startup_loader upload failed (attempt %d/%d): read_ret=%d, result=%u\n",
+				retry_cnt + 1, MAX_LOADING_ATTEMPTS, ret, reply.base.result);
+			goto out_sock;
+		}
 
-	ret = tz_iwsock_read(sd, &reply, sizeof(reply), 0);
-	if (ret < 0) {
-		tzdev_print(0, "tz_iwsock_read fail, ret=%d\n", ret);
-		goto out_sock;
-	}
+		if (reply.base.base.cmd != CMD_STARTUP_LOADER_REPLY_UPLOAD_CONTAINER) {
+			pr_warn("tzdev: unexpected reply cmd=%u\n", reply.base.base.cmd);
+		}
 
-	if (reply.base.result)
-		panic("tzdev: iwsock error. result=%d\n", reply.base.result);
-
-	if (reply.base.base.cmd != CMD_STARTUP_LOADER_REPLY_UPLOAD_CONTAINER)
-		panic("tzdev: iwsock wrong cmd. cmd=%u\n", reply.base.base.cmd);
-
-	ret = 0;
-	tzdev_print(0, "[debug] Startuploader complete\n");
+		pr_info("tzdev: [debug] Startuploader complete successfully!\n");
+		tz_iwsock_release(sd);
+		tzdev_mem_release(command.buf_desc.id);
+		vfree(tzar);
+		tzar_deploy_result = 0;
+		ret = 0;
+		break;
 
 out_sock:
-	tz_iwsock_release(sd);
-out_mem:
-	tzdev_mem_release(command.buf_desc.id);
-out_tzar:
-	vfree(tzar);
+		tz_iwsock_release(sd);
+		tzdev_mem_release(command.buf_desc.id);
+		vfree(tzar);
+		msleep(200);
+	}
 
-	return ret;
+	if (tzar_deploy_result != 0) {
+		pr_err("tzdev: Failed to deploy startup.tzar after %d attempts!\n", MAX_LOADING_ATTEMPTS);
+	}
+
+	return tzar_deploy_result;
 }
 
 int tzdev_deploy_tzar(void)
@@ -148,8 +173,9 @@ int tzdev_deploy_tzar(void)
 
 	t = kthread_run(tz_deploy_handler, NULL, "tzdev_deploy_tzar");
 	if (IS_ERR(t)) {
-		printk("Can't start startup.tzar deployment thread\n");
+		pr_err("Can't start startup.tzar deployment thread\n");
 		return PTR_ERR(t);
 	}
+
 	return 0;
 }
