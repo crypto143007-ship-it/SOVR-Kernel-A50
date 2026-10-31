@@ -42,10 +42,13 @@ then
 	fi
 	mv -f "$download_file" "$DIR/magisk.zip"
 
-	7z e "$DIR/magisk.zip" lib/arm64-v8a/libmagiskinit.so lib/armeabi-v7a/libmagisk32.so lib/arm64-v8a/libmagisk64.so assets/stub.apk -o"$DIR" -y
+	7z e "$DIR/magisk.zip" lib/arm64-v8a/libmagiskinit.so -o"$DIR" -y
 	mv -f "$DIR/libmagiskinit.so" "$DIR/magiskinit"
-	mv -f "$DIR/libmagisk32.so" "$DIR/magisk32"
-	mv -f "$DIR/libmagisk64.so" "$DIR/magisk64"
+	7z e "$DIR/magisk.zip" lib/armeabi-v7a/libmagisk.so -o"$DIR" -y
+	mv -f "$DIR/libmagisk.so" "$DIR/magisk32"
+	7z e "$DIR/magisk.zip" lib/arm64-v8a/libmagisk.so -o"$DIR" -y
+	mv -f "$DIR/libmagisk.so" "$DIR/magisk64"
+	7z e "$DIR/magisk.zip" assets/stub.apk -o"$DIR" -y
 	mv -f "$DIR/stub.apk" "$DIR/stub"
 	xz --force --check=crc32 "$DIR/magisk32" "$DIR/magisk64" "$DIR/stub"
 
