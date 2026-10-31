@@ -99,9 +99,22 @@ verify_toolchain() {
 			exit_script
 		fi
 	elif [[ ${BUILD_PREF_COMPILER_VERSION} == 'aosp_17' ]]; then
-		AOSP_CLANG="$HOME/toolchains/clang-r487747c"
+		AOSP_CLANG="${CLANG_DIR:-$HOME/toolchains/clang-r487747c}"
 		if [[ -d "${AOSP_CLANG}" ]]; then
+			for tool in clang clang++ ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-readelf llvm-strip llvm-as llvm-ranlib; do
+				if [[ ! -x "${AOSP_CLANG}/bin/${tool}" ]]; then
+					script_echo "E: Required AOSP Clang tool is missing or not executable: ${AOSP_CLANG}/bin/${tool}"
+					exit_script
+				fi
+			done
+			if [[ ! -f "${AOSP_CLANG}/AndroidVersion.txt" ]] ||
+				[[ "$(sed -n '1p' "${AOSP_CLANG}/AndroidVersion.txt")" != '17.0.2' ]] ||
+				[[ "$(sed -n '2p' "${AOSP_CLANG}/AndroidVersion.txt")" != 'based on r487747c' ]]; then
+				script_echo "E: Expected Google AOSP Clang 17.0.2 (r487747c) metadata in ${AOSP_CLANG}/AndroidVersion.txt"
+				exit_script
+			fi
 			script_echo "I: Using AOSP Clang 17 toolchain from ${AOSP_CLANG}"
+			"${AOSP_CLANG}/bin/clang" --version | sed -n '1p'
 			export PATH="${AOSP_CLANG}/bin:${TOOLCHAIN_EXT}/bin:$PATH"
 			export LD_LIBRARY_PATH="${AOSP_CLANG}/lib:${AOSP_CLANG}/lib64:${TOOLCHAIN_EXT}/lib:$LD_LIBRARY_PATH"
 		else

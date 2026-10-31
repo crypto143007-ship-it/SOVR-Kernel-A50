@@ -77,7 +77,7 @@ Feature descriptions below reflect the v4.0 project baseline unless explicitly m
 | **SoC Architecture** | Samsung Exynos 9610 (10nm FinFET) |
 | **CPU Configuration** | 4x Cortex-A73 @ 2.3 GHz + 4x Cortex-A53 @ 1.7 GHz (ARMv8.0-A) |
 | **GPU** | ARM Mali-G72 MP3; build fragments select Bifrost R32P1 (Android 12) or R38P1 (Android 14), not yet device-validated |
-| **Toolchain** | Google AOSP Clang 17.0.2 (`clang-r487747c`) + LLD 17.0.2 |
+| **Toolchain** | Google AOSP Clang 17.0.2 (`clang-r487747c`) + LLD 17.0.2, pinned to prebuilts commit `fd582b924a400906979f54121c05555b453d5c35` |
 | **Optimization Target** | ARM64 crypto/CRC/SHA2 flags and heterogeneous A73/A53 tuning; effective build flags require log verification |
 | **Kernel Preemption** | `CONFIG_PREEMPT=y` |
 | **Root Subsystem** | KernelSU-Next v3.4.2 (UAPI v5, Code 33355) |
@@ -128,6 +128,7 @@ SOVR-Kernel-A50/
 * Host OS: Ubuntu 22.04 LTS (Native or WSL2)
 * Compiler: Google AOSP Clang 17.0.2 (`clang-r487747c`)
 * Linker: LLVM LLD 17.0.2
+* CI obtains the compiler from the official Android prebuilts repository at commit `fd582b924a400906979f54121c05555b453d5c35`.
 
 ### Compilation Commands
 

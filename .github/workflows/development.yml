@@ -14,21 +14,28 @@ permissions:
   contents: read
 
 jobs:
+  prepare-toolchain:
+    name: Prepare pinned Google AOSP Clang 17.0.2
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup-aosp-clang
+
   oneui-s-e:
     name: Build One UI 4 (Enforcing)
-    runs-on: ubuntu-latest
+    needs: prepare-toolchain
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: true
       
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
-    - uses: szenius/set-timezone@v1.0
-      with:
-        timezoneLinux: "Asia/Manila"
-        timezoneMacos: "Asia/Manila"
-        timezoneWindows: "Philippine Standard Time"
+    - name: Set timezone
+      run: |
+        sudo ln -snf /usr/share/zoneinfo/Asia/Manila /etc/localtime
+        echo Asia/Manila | sudo tee /etc/timezone >/dev/null
 
     - name: Export build branch
       run: echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
@@ -38,8 +45,9 @@ jobs:
       run: sudo apt-get update
 
     - name: Install Debian/Ubuntu dependencies
-      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq -y && (sudo apt-get install libncurses5 -y || sudo apt-get install libncurses6 libncurses-dev -y || true)
+      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq libncurses6 libncurses-dev unzip binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu binutils-arm-linux-gnueabi gcc-arm-linux-gnueabi -y
 
+    - uses: ./.github/actions/setup-aosp-clang
     - name: Build Mint kernel
       run: |
           set -eo pipefail
@@ -51,53 +59,56 @@ jobs:
           mkdir -p ./release
           mv -f `find ./ -maxdepth 2 -iname "SOVR-Kernel-*.zip" -o -iname "MintBeta-*.zip" -o -iname "*.zip"` ./release/ 2>/dev/null || true
 
-    - name: Upload release package
-      uses: actions/upload-artifact@v4
-      with:
-        name: One UI Four Kernel ZIPs
-        path: 'release'
-        if-no-files-found: error
-
     - name: Prepare build config artifact
       run: |
           cp .config ./release/kernel_config_a50_oneui-s-e.txt
 
+    - name: Validate build artifacts and create checksums
+      run: bash ./.github/scripts/validate-kernel-artifacts.sh release/kernel_config_a50_oneui-s-e.txt
+
+    - name: Upload release package
+      uses: actions/upload-artifact@v7
+      with:
+        name: One UI Four Kernel ZIPs - ${{ github.job }}
+        path: 'release'
+        if-no-files-found: error
+
     - name: Upload kernel image artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: One UI 4 Kernel Image (Enforcing)
-        path: 'tools/make/boot.img'
+        path: 'release/boot-${{ github.job }}.img'
         if-no-files-found: error
 
     - name: Upload build config artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Kernel Configs
+        name: Kernel Config - ${{ github.job }}
         path: 'release/kernel_config_a50_oneui-s-e.txt'
         if-no-files-found: error
 
     - name: Upload release package
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Release
+        name: Release - ${{ github.job }}
         path: 'release'
         if-no-files-found: error
 
   oneui-s-m:
     name: Build One UI 4 (Enforcing; Magisk Canary)
-    runs-on: ubuntu-latest
+    needs: prepare-toolchain
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: true
       
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
-    - uses: szenius/set-timezone@v1.0
-      with:
-        timezoneLinux: "Asia/Manila"
-        timezoneMacos: "Asia/Manila"
-        timezoneWindows: "Philippine Standard Time"
+    - name: Set timezone
+      run: |
+        sudo ln -snf /usr/share/zoneinfo/Asia/Manila /etc/localtime
+        echo Asia/Manila | sudo tee /etc/timezone >/dev/null
 
     - name: Export build branch
       run: echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
@@ -107,8 +118,9 @@ jobs:
       run: sudo apt-get update
 
     - name: Install Debian/Ubuntu dependencies
-      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq -y && (sudo apt-get install libncurses5 -y || sudo apt-get install libncurses6 libncurses-dev -y || true)
+      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq libncurses6 libncurses-dev unzip binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu binutils-arm-linux-gnueabi gcc-arm-linux-gnueabi -y
 
+    - uses: ./.github/actions/setup-aosp-clang
     - name: Build Mint kernel
       run: |
           set -eo pipefail
@@ -120,46 +132,49 @@ jobs:
           mkdir -p ./release
           mv -f `find ./ -maxdepth 2 -iname "SOVR-Kernel-*.zip" -o -iname "MintBeta-*.zip" -o -iname "*.zip"` ./release/ 2>/dev/null || true
 
-    - name: Upload release package
-      uses: actions/upload-artifact@v4
-      with:
-        name: One UI Four Kernel ZIPs (Canary)
-        path: 'release'
-        if-no-files-found: error
-
     - name: Prepare build config artifact
       run: |
           cp .config ./release/kernel_config_a50_oneui-s-c.txt
 
+    - name: Validate build artifacts and create checksums
+      run: bash ./.github/scripts/validate-kernel-artifacts.sh release/kernel_config_a50_oneui-s-c.txt
+
+    - name: Upload release package
+      uses: actions/upload-artifact@v7
+      with:
+        name: One UI Four Kernel ZIPs (Canary) - ${{ github.job }}
+        path: 'release'
+        if-no-files-found: error
+
     - name: Upload kernel image artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: One UI 4 Kernel Image (Enforcing; Canary)
-        path: 'tools/make/boot.img'
+        path: 'release/boot-${{ github.job }}.img'
         if-no-files-found: error
 
     - name: Upload build config artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Kernel Configs
+        name: Kernel Config - ${{ github.job }}
         path: 'release/kernel_config_a50_oneui-s-c.txt'
         if-no-files-found: error
 
   oneui-s-p:
     name: Build One UI 4 (Permissive)
-    runs-on: ubuntu-latest
+    needs: prepare-toolchain
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: true
       
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
-    - uses: szenius/set-timezone@v1.0
-      with:
-        timezoneLinux: "Asia/Manila"
-        timezoneMacos: "Asia/Manila"
-        timezoneWindows: "Philippine Standard Time"
+    - name: Set timezone
+      run: |
+        sudo ln -snf /usr/share/zoneinfo/Asia/Manila /etc/localtime
+        echo Asia/Manila | sudo tee /etc/timezone >/dev/null
 
     - name: Export build branch
       run: echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
@@ -169,8 +184,9 @@ jobs:
       run: sudo apt-get update
 
     - name: Install Debian/Ubuntu dependencies
-      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq -y && (sudo apt-get install libncurses5 -y || sudo apt-get install libncurses6 libncurses-dev -y || true)
+      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq libncurses6 libncurses-dev unzip binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu binutils-arm-linux-gnueabi gcc-arm-linux-gnueabi -y
 
+    - uses: ./.github/actions/setup-aosp-clang
     - name: Build Mint kernel
       run: |
           set -eo pipefail
@@ -186,43 +202,46 @@ jobs:
       run: |
           cp .config ./release/kernel_config_a50_oneui-s-p.txt
 
+    - name: Validate build artifacts and create checksums
+      run: bash ./.github/scripts/validate-kernel-artifacts.sh release/kernel_config_a50_oneui-s-p.txt
+
     - name: Upload kernel image artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: One UI 4 Kernel Image (Permissive)
-        path: 'tools/make/boot.img'
+        path: 'release/boot-${{ github.job }}.img'
         if-no-files-found: error
 
     - name: Upload build config artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Kernel Configs
+        name: Kernel Config - ${{ github.job }}
         path: 'release/kernel_config_a50_oneui-s-p.txt'
         if-no-files-found: error
 
     - name: Upload release package
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Release
+        name: Release - ${{ github.job }}
         path: 'release'
         if-no-files-found: error
 
   aosp-s-e:
     name: Build AOSP 12 (Enforcing)
+    needs: prepare-toolchain
     if: ${{ !contains(github.event.head_commit.message, '[skip rel]') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: true
       
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
-    - uses: szenius/set-timezone@v1.0
-      with:
-        timezoneLinux: "Asia/Manila"
-        timezoneMacos: "Asia/Manila"
-        timezoneWindows: "Philippine Standard Time"
+    - name: Set timezone
+      run: |
+        sudo ln -snf /usr/share/zoneinfo/Asia/Manila /etc/localtime
+        echo Asia/Manila | sudo tee /etc/timezone >/dev/null
 
     - name: Export build branch
       run: echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
@@ -232,8 +251,9 @@ jobs:
       run: sudo apt-get update
 
     - name: Install Debian/Ubuntu dependencies
-      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq -y && (sudo apt-get install libncurses5 -y || sudo apt-get install libncurses6 libncurses-dev -y || true)
+      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq libncurses6 libncurses-dev unzip binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu binutils-arm-linux-gnueabi gcc-arm-linux-gnueabi -y
 
+    - uses: ./.github/actions/setup-aosp-clang
     - name: Build Mint kernel
       run: |
           set -eo pipefail
@@ -249,43 +269,46 @@ jobs:
       run: |
           cp .config ./release/kernel_config_a50_aosp-s-e.txt
 
+    - name: Validate build artifacts and create checksums
+      run: bash ./.github/scripts/validate-kernel-artifacts.sh release/kernel_config_a50_aosp-s-e.txt
+
     - name: Upload kernel image artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: AOSP 12 Kernel Image (Enforcing)
-        path: 'tools/make/boot.img'
+        path: 'release/boot-${{ github.job }}.img'
         if-no-files-found: error
 
     - name: Upload build config artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Kernel Configs
+        name: Kernel Config - ${{ github.job }}
         path: 'release/kernel_config_a50_aosp-s-e.txt'
         if-no-files-found: error
 
     - name: Upload release package
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Release
+        name: Release - ${{ github.job }}
         path: 'release'
         if-no-files-found: error
 
   aosp-s-p:
     name: Build AOSP 12 (Permissive)
+    needs: prepare-toolchain
     if: ${{ !contains(github.event.head_commit.message, '[skip rel]') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: true
       
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
-    - uses: szenius/set-timezone@v1.0
-      with:
-        timezoneLinux: "Asia/Manila"
-        timezoneMacos: "Asia/Manila"
-        timezoneWindows: "Philippine Standard Time"
+    - name: Set timezone
+      run: |
+        sudo ln -snf /usr/share/zoneinfo/Asia/Manila /etc/localtime
+        echo Asia/Manila | sudo tee /etc/timezone >/dev/null
 
     - name: Export build branch
       run: echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
@@ -295,8 +318,9 @@ jobs:
       run: sudo apt-get update
 
     - name: Install Debian/Ubuntu dependencies
-      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq -y && (sudo apt-get install libncurses5 -y || sudo apt-get install libncurses6 libncurses-dev -y || true)
+      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq libncurses6 libncurses-dev unzip binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu binutils-arm-linux-gnueabi gcc-arm-linux-gnueabi -y
 
+    - uses: ./.github/actions/setup-aosp-clang
     - name: Build Mint kernel
       run: |
           set -eo pipefail
@@ -312,43 +336,46 @@ jobs:
       run: |
           cp .config ./release/kernel_config_a50_aosp-s-p.txt
 
+    - name: Validate build artifacts and create checksums
+      run: bash ./.github/scripts/validate-kernel-artifacts.sh release/kernel_config_a50_aosp-s-p.txt
+
     - name: Upload kernel image artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: AOSP 12 Kernel Image (Permissive)
-        path: 'tools/make/boot.img'
+        path: 'release/boot-${{ github.job }}.img'
         if-no-files-found: error
 
     - name: Upload build config artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Kernel Configs
+        name: Kernel Config - ${{ github.job }}
         path: 'release/kernel_config_a50_aosp-s-p.txt'
         if-no-files-found: error
 
     - name: Upload release package
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Release
+        name: Release - ${{ github.job }}
         path: 'release'
         if-no-files-found: error
 
   oneui-r-e:
     name: Build One UI 3 (Enforcing)
+    needs: prepare-toolchain
     if: ${{ !contains(github.event.head_commit.message, '[skip rel]') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: true
       
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
-    - uses: szenius/set-timezone@v1.0
-      with:
-        timezoneLinux: "Asia/Manila"
-        timezoneMacos: "Asia/Manila"
-        timezoneWindows: "Philippine Standard Time"
+    - name: Set timezone
+      run: |
+        sudo ln -snf /usr/share/zoneinfo/Asia/Manila /etc/localtime
+        echo Asia/Manila | sudo tee /etc/timezone >/dev/null
 
     - name: Export build branch
       run: echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
@@ -358,8 +385,9 @@ jobs:
       run: sudo apt-get update
 
     - name: Install Debian/Ubuntu dependencies
-      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq -y && (sudo apt-get install libncurses5 -y || sudo apt-get install libncurses6 libncurses-dev -y || true)
+      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq libncurses6 libncurses-dev unzip binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu binutils-arm-linux-gnueabi gcc-arm-linux-gnueabi -y
 
+    - uses: ./.github/actions/setup-aosp-clang
     - name: Build Mint kernel
       run: |
           set -eo pipefail
@@ -375,43 +403,46 @@ jobs:
       run: |
           cp .config ./release/kernel_config_a50_oneui-r-e.txt
 
+    - name: Validate build artifacts and create checksums
+      run: bash ./.github/scripts/validate-kernel-artifacts.sh release/kernel_config_a50_oneui-r-e.txt
+
     - name: Upload kernel image artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: One UI 3 Kernel Image (Enforcing)
-        path: 'tools/make/boot.img'
+        path: 'release/boot-${{ github.job }}.img'
         if-no-files-found: error
 
     - name: Upload build config artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Kernel Configs
+        name: Kernel Config - ${{ github.job }}
         path: 'release/kernel_config_a50_oneui-r-e.txt'
         if-no-files-found: error
 
     - name: Upload release package
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Release
+        name: Release - ${{ github.job }}
         path: 'release'
         if-no-files-found: error
 
   oneui-r-p:
     name: Build One UI 3 (Permissive)
+    needs: prepare-toolchain
     if: ${{ !contains(github.event.head_commit.message, '[skip rel]') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: true
       
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
-    - uses: szenius/set-timezone@v1.0
-      with:
-        timezoneLinux: "Asia/Manila"
-        timezoneMacos: "Asia/Manila"
-        timezoneWindows: "Philippine Standard Time"
+    - name: Set timezone
+      run: |
+        sudo ln -snf /usr/share/zoneinfo/Asia/Manila /etc/localtime
+        echo Asia/Manila | sudo tee /etc/timezone >/dev/null
 
     - name: Export build branch
       run: echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
@@ -421,8 +452,9 @@ jobs:
       run: sudo apt-get update
 
     - name: Install Debian/Ubuntu dependencies
-      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq -y && (sudo apt-get install libncurses5 -y || sudo apt-get install libncurses6 libncurses-dev -y || true)
+      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq libncurses6 libncurses-dev unzip binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu binutils-arm-linux-gnueabi gcc-arm-linux-gnueabi -y
 
+    - uses: ./.github/actions/setup-aosp-clang
     - name: Build Mint kernel
       run: |
           set -eo pipefail
@@ -438,43 +470,46 @@ jobs:
       run: |
           cp .config ./release/kernel_config_a50_oneui-r-p.txt
 
+    - name: Validate build artifacts and create checksums
+      run: bash ./.github/scripts/validate-kernel-artifacts.sh release/kernel_config_a50_oneui-r-p.txt
+
     - name: Upload kernel image artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: One UI 3 Kernel Image (Permissive)
-        path: 'tools/make/boot.img'
+        path: 'release/boot-${{ github.job }}.img'
         if-no-files-found: error
 
     - name: Upload build config artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Kernel Configs
+        name: Kernel Config - ${{ github.job }}
         path: 'release/kernel_config_a50_oneui-r-p.txt'
         if-no-files-found: error
 
     - name: Upload release package
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Release
+        name: Release - ${{ github.job }}
         path: 'release'
         if-no-files-found: error
 
   aosp-r-e:
     name: Build AOSP 11 (Enforcing)
+    needs: prepare-toolchain
     if: ${{ !contains(github.event.head_commit.message, '[skip rel]') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: true
       
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
-    - uses: szenius/set-timezone@v1.0
-      with:
-        timezoneLinux: "Asia/Manila"
-        timezoneMacos: "Asia/Manila"
-        timezoneWindows: "Philippine Standard Time"
+    - name: Set timezone
+      run: |
+        sudo ln -snf /usr/share/zoneinfo/Asia/Manila /etc/localtime
+        echo Asia/Manila | sudo tee /etc/timezone >/dev/null
 
     - name: Export build branch
       run: echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
@@ -484,8 +519,9 @@ jobs:
       run: sudo apt-get update
 
     - name: Install Debian/Ubuntu dependencies
-      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq -y && (sudo apt-get install libncurses5 -y || sudo apt-get install libncurses6 libncurses-dev -y || true)
+      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq libncurses6 libncurses-dev unzip binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu binutils-arm-linux-gnueabi gcc-arm-linux-gnueabi -y
 
+    - uses: ./.github/actions/setup-aosp-clang
     - name: Build Mint kernel
       run: |
           set -eo pipefail
@@ -497,54 +533,57 @@ jobs:
           mkdir -p ./release
           mv -f `find ./ -maxdepth 2 -iname "SOVR-Kernel-*.zip" -o -iname "MintBeta-*.zip" -o -iname "*.zip"` ./release/ 2>/dev/null || true
 
-    - name: Upload release package
-      uses: actions/upload-artifact@v4
-      with:
-        name: One UI Four Kernel ZIPs
-        path: 'release'
-        if-no-files-found: error
-
     - name: Prepare build config artifact
       run: |
           cp .config ./release/kernel_config_a50_aosp-r-e.txt
 
+    - name: Validate build artifacts and create checksums
+      run: bash ./.github/scripts/validate-kernel-artifacts.sh release/kernel_config_a50_aosp-r-e.txt
+
+    - name: Upload release package
+      uses: actions/upload-artifact@v7
+      with:
+        name: One UI Four Kernel ZIPs - ${{ github.job }}
+        path: 'release'
+        if-no-files-found: error
+
     - name: Upload kernel image artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: AOSP 11 Kernel Image (Enforcing)
-        path: 'tools/make/boot.img'
+        path: 'release/boot-${{ github.job }}.img'
         if-no-files-found: error
 
     - name: Upload build config artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Kernel Configs
+        name: Kernel Config - ${{ github.job }}
         path: 'release/kernel_config_a50_aosp-r-e.txt'
         if-no-files-found: error
 
     - name: Upload release package
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Release
+        name: Release - ${{ github.job }}
         path: 'release'
         if-no-files-found: error
 
   aosp-r-p:
     name: Build AOSP 11 (Permissive)
+    needs: prepare-toolchain
     if: ${{ !contains(github.event.head_commit.message, '[skip rel]') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: true
       
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
-    - uses: szenius/set-timezone@v1.0
-      with:
-        timezoneLinux: "Asia/Manila"
-        timezoneMacos: "Asia/Manila"
-        timezoneWindows: "Philippine Standard Time"
+    - name: Set timezone
+      run: |
+        sudo ln -snf /usr/share/zoneinfo/Asia/Manila /etc/localtime
+        echo Asia/Manila | sudo tee /etc/timezone >/dev/null
 
     - name: Export build branch
       run: echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
@@ -554,8 +593,9 @@ jobs:
       run: sudo apt-get update
 
     - name: Install Debian/Ubuntu dependencies
-      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq -y && (sudo apt-get install libncurses5 -y || sudo apt-get install libncurses6 libncurses-dev -y || true)
+      run: sudo apt-get install bzip2 lib32stdc++6 libc6-dev-i386 jq libncurses6 libncurses-dev unzip binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu binutils-arm-linux-gnueabi gcc-arm-linux-gnueabi -y
 
+    - uses: ./.github/actions/setup-aosp-clang
     - name: Build Mint kernel
       run: |
           set -eo pipefail
@@ -571,24 +611,27 @@ jobs:
       run: |
           cp .config ./release/kernel_config_a50_aosp-r-p.txt
 
+    - name: Validate build artifacts and create checksums
+      run: bash ./.github/scripts/validate-kernel-artifacts.sh release/kernel_config_a50_aosp-r-p.txt
+
     - name: Upload kernel image artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: AOSP 11 Kernel Image (Permissive)
-        path: 'tools/make/boot.img'
+        path: 'release/boot-${{ github.job }}.img'
         if-no-files-found: error
 
     - name: Upload build config artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Kernel Configs
+        name: Kernel Config - ${{ github.job }}
         path: 'release/kernel_config_a50_aosp-r-p.txt'
         if-no-files-found: error
 
     - name: Upload release package
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: Release
+        name: Release - ${{ github.job }}
         path: 'release'
         if-no-files-found: error
 
@@ -596,20 +639,19 @@ jobs:
     name: Release files and configs
     if: ${{ !contains(github.event.head_commit.message, '[skip rel]') }}
     needs: [oneui-s-e, oneui-s-p, oneui-r-e, oneui-r-p, aosp-s-e, aosp-s-p, aosp-r-e, aosp-r-p]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: true
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
-    - uses: szenius/set-timezone@v1.0
-      with:
-        timezoneLinux: "Asia/Manila"
-        timezoneMacos: "Asia/Manila"
-        timezoneWindows: "Philippine Standard Time"
+    - name: Set timezone
+      run: |
+        sudo ln -snf /usr/share/zoneinfo/Asia/Manila /etc/localtime
+        echo Asia/Manila | sudo tee /etc/timezone >/dev/null
 
     - name: Merge Releases
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         path: release
         merge-multiple: true
