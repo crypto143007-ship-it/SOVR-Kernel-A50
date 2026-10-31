@@ -107,22 +107,29 @@ if [ ! -z "$oneui" ] || [ ! -z "$fresh" ]; then
 		chmod 644 /system_root/system/etc/init/init.fresh.perf.rc
 	fi
 else
-	ui_print "  - AOSP ROM detected!"
-	ui_print "    - Enabling native ZRAM writeback"
+	vendor_fs_info=$($BB blkid /dev/block/platform/13520000.ufs/by-name/vendor 2>/dev/null)
+	if [ -z "$vendor_fs_info" ]; then
+		ui_print "  - WARNING: Could not identify the vendor filesystem; skipping native ZRAM writeback integration"
+	elif echo "$vendor_fs_info" | $BB grep -qi erofs; then
+		ui_print "  - EROFS vendor detected; skipping native ZRAM writeback integration"
+	else
+		ui_print "  - AOSP ROM detected!"
+		ui_print "    - Enabling native ZRAM writeback"
 
-	mkdir -p /vendor/overlay
-	cp -rf $AK_FOLDER/files_aosp/vendor/overlay/MintZramWb.apk /vendor/overlay/MintZramWb.apk
-	cp -rf $AK_FOLDER/files_aosp/vendor/etc/fstab.zram /vendor/etc/fstab.zram
+		mkdir -p /vendor/overlay
+		cp -rf $AK_FOLDER/files_aosp/vendor/overlay/MintZramWb.apk /vendor/overlay/MintZramWb.apk
+		cp -rf $AK_FOLDER/files_aosp/vendor/etc/fstab.zram /vendor/etc/fstab.zram
 
-	chmod 644 /vendor/overlay/MintZramWb.apk
-	chmod 644 /vendor/etc/fstab.zram
+		chmod 644 /vendor/overlay/MintZramWb.apk
+		chmod 644 /vendor/etc/fstab.zram
 
-	patch_prop /vendor/build.prop 'ro.zram.mark_idle_delay_mins' '60'
-	patch_prop /vendor/build.prop 'ro.zram.first_wb_delay_mins' '1440'
-	patch_prop /vendor/build.prop 'ro.zram.periodic_wb_delay_hours' '24'
-	replace_string ${VENDOR_INIT_RC} 'swapon_all /vendor/etc/fstab.dummy' 'swapon_all /vendor/etc/fstab.exynos9610' 'swapon_all /vendor/etc/fstab.zram' global
-	replace_string ${VENDOR_INIT_RC} 'swapon_all /vendor/etc/fstab.dummy' 'swapon_all /vendor/etc/fstab.sqzr' 'swapon_all /vendor/etc/fstab.zram' global
-	append_file ${VENDOR_INIT_RC} 'swapon_all /vendor/etc/fstab.zram' init.zram.rc
+		patch_prop /vendor/build.prop 'ro.zram.mark_idle_delay_mins' '60'
+		patch_prop /vendor/build.prop 'ro.zram.first_wb_delay_mins' '1440'
+		patch_prop /vendor/build.prop 'ro.zram.periodic_wb_delay_hours' '24'
+		replace_string ${VENDOR_INIT_RC} 'swapon_all /vendor/etc/fstab.dummy' 'swapon_all /vendor/etc/fstab.exynos9610' 'swapon_all /vendor/etc/fstab.zram' global
+		replace_string ${VENDOR_INIT_RC} 'swapon_all /vendor/etc/fstab.dummy' 'swapon_all /vendor/etc/fstab.sqzr' 'swapon_all /vendor/etc/fstab.zram' global
+		append_file ${VENDOR_INIT_RC} 'swapon_all /vendor/etc/fstab.zram' init.zram.rc
+	fi
 fi
 
 umount /system

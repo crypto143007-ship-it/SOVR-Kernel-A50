@@ -1,4 +1,6 @@
 #!/bin/bash
+set -eo pipefail
+
 # =========================================
 #         _____              _      
 #        |  ___| __ ___  ___| |__   
@@ -97,9 +99,22 @@ verify_toolchain() {
 			exit_script
 		fi
 	elif [[ ${BUILD_PREF_COMPILER_VERSION} == 'aosp_17' ]]; then
-		AOSP_CLANG="$HOME/toolchains/clang-r487747c"
+		AOSP_CLANG="${CLANG_DIR:-$HOME/toolchains/clang-r487747c}"
 		if [[ -d "${AOSP_CLANG}" ]]; then
+			for tool in clang clang++ ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-readelf llvm-strip llvm-as llvm-ranlib; do
+				if [[ ! -x "${AOSP_CLANG}/bin/${tool}" ]]; then
+					script_echo "E: Required AOSP Clang tool is missing or not executable: ${AOSP_CLANG}/bin/${tool}"
+					exit_script
+				fi
+			done
+			if [[ ! -f "${AOSP_CLANG}/AndroidVersion.txt" ]] ||
+				[[ "$(sed -n '1p' "${AOSP_CLANG}/AndroidVersion.txt")" != '17.0.2' ]] ||
+				[[ "$(sed -n '2p' "${AOSP_CLANG}/AndroidVersion.txt")" != 'based on r487747c' ]]; then
+				script_echo "E: Expected Google AOSP Clang 17.0.2 (r487747c) metadata in ${AOSP_CLANG}/AndroidVersion.txt"
+				exit_script
+			fi
 			script_echo "I: Using AOSP Clang 17 toolchain from ${AOSP_CLANG}"
+			"${AOSP_CLANG}/bin/clang" --version | sed -n '1p'
 			export PATH="${AOSP_CLANG}/bin:${TOOLCHAIN_EXT}/bin:$PATH"
 			export LD_LIBRARY_PATH="${AOSP_CLANG}/lib:${AOSP_CLANG}/lib64:${TOOLCHAIN_EXT}/lib:$LD_LIBRARY_PATH"
 		else
@@ -177,7 +192,7 @@ fill_magisk_config() {
 
 	# Create a unique random seed per-build
 	script_echo "   - Generating a unique random seed for this build..."
-	RANDOMSEED=$(tr -dc 'a-f0-9' < /dev/urandom | head -c 16)
+	RANDOMSEED=$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')
 	echo "RANDOMSEED=0x$RANDOMSEED" >> "$MAGISK_USR_DIR/backup_magisk"
 }
 
@@ -277,6 +292,11 @@ build_kernel() {
 
 build_image() {
 	if [[ -e "$(pwd)/arch/arm64/boot/Image" ]]; then
+		SELINUX_MODE=enforcing
+		if [[ ${BUILD_KERNEL_PERMISSIVE} == 'true' || ${BUILD_KERNEL_CODE} == 'aosp' ]]; then
+			SELINUX_MODE=permissive
+		fi
+
 		script_echo " "
 		script_echo "I: Building kernel image..."
 		script_echo "    Header/Page size: ${DEVICE_KERNEL_HEADER}/${DEVICE_KERNEL_PAGESIZE}"
@@ -287,7 +307,7 @@ build_image() {
 
 		${ORIGIN_DIR}/tools/make/bin/mkbootimg \
 				  --kernel $(pwd)/arch/arm64/boot/Image \
-				  --cmdline "androidboot.selinux=permissive androidboot.selinux=permissive loop.max_part=7" --board "$DEVICE_KERNEL_BOARD" \
+				  --cmdline "androidboot.selinux=${SELINUX_MODE} loop.max_part=7" --board "$DEVICE_KERNEL_BOARD" \
 				  --base $DEVICE_KERNEL_BASE --pagesize $DEVICE_KERNEL_PAGESIZE \
 				  --kernel_offset $DEVICE_KERNEL_OFFSET --ramdisk_offset $DEVICE_RAMDISK_OFFSET \
 				  --second_offset $DEVICE_SECOND_OFFSET --tags_offset $DEVICE_TAGS_OFFSET \
