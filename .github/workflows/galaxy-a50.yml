@@ -532,6 +532,7 @@ jobs:
     - name: Merge Releases
       uses: actions/download-artifact@v8
       with:
+        pattern: 'Release - *'
         path: release
         merge-multiple: true
 
