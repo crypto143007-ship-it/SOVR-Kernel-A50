@@ -2714,15 +2714,15 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&ufs_rst_n &ufs_refclk_out>;
 		clocks =
-  		/* aclk clock */
+		/* aclk clock */
 			<&clock GATE_UFS_EMBD_QCH_UFS>,
-  		/* unipro clocks */
+		/* unipro clocks */
 			<&clock UFS_EMBD>;
 
 		clock-names =
-  		/* aclk clocks */
+		/* aclk clocks */
 			"GATE_UFS_EMBD_QCH_UFS",
-  		/* unipro clocks */
+		/* unipro clocks */
 			"UFS_EMBD";
 
 		/* PM QoS for INT power domain */

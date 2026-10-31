@@ -92,8 +92,8 @@ if [ ! -z "$oneui" ] || [ ! -z "$fresh" ]; then
 		replace_string ${VENDOR_INIT_RC} 'swapon_all /vendor/etc/fstab.dummy' 'swapon_all /vendor/etc/fstab.zram' 'swapon_all /vendor/etc/fstab.sqzr' global
 		append_file ${VENDOR_INIT_RC} 'swapon_all /vendor/etc/fstab.sqzr' init.ramplus.rc
 		append_file ${VENDOR_INIT_RC} 'start pageboostd' init.pageboost.rc
-	elif [ "${sdk_ver}" == "34" ] || [ "${sdk_ver}" == "35" ]; then
-		ui_print "  - One UI 6+ / Fresh 6 detected (Android 14+)!"
+	elif [ "${sdk_ver}" == "34" ] || [ "${sdk_ver}" == "35" ] || [ "${sdk_ver}" == "36" ]; then
+		ui_print "  - Android 14+ One UI / Fresh profile detected!"
 		ui_print "    - Installing SOVR performance profile (Zest)..."
 		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system/etc/init/init.fresh.perf.rc 2>/dev/null || true
 		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system_root/system/etc/init/init.fresh.perf.rc 2>/dev/null || true

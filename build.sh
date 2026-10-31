@@ -218,6 +218,7 @@ show_usage() {
 	script_echo "-k, --ksu                 Enable KernelSU (v0.9.5) native kernel root."
 	script_echo "-m, --magisk [canary]     Pre-root the kernel with Magisk. Optional flag to use canary builds."
 	script_echo "                          Not available for 'recovery' variant."
+	script_echo "    --package-name <name>  Override the output ZIP basename (without .zip)."
 	script_echo "-p, --permissive          Build kernel with SELinux fully permissive. NOT RECOMMENDED!"
 	script_echo " "
 	script_echo "-h, --help                Show this message."
@@ -441,6 +442,8 @@ build_package() {
 	echo "ro.mint.build.branch=${BUILD_KERNEL_BRANCH}" >> $(pwd)/tools/make/package/mint.prop
 	echo "ro.mint.droid.device=${BUILD_DEVICE_NAME^}" >> $(pwd)/tools/make/package/mint.prop
 	echo "ro.mint.droid.variant=${FILE_KERNEL_CODE^}" >> $(pwd)/tools/make/package/mint.prop
+	echo "ro.mint.build.package=${SOVR_PACKAGE_NAME}" >> $(pwd)/tools/make/package/mint.prop
+	echo "ro.mint.build.root=${BUILD_KERNEL_PACKAGE_TYPE}" >> $(pwd)/tools/make/package/mint.prop
 
 	if [[ ${BUILD_KERNEL_BRANCH} == "mainline" ]]; then
 		echo "ro.mint.droid.beta=false" >> $(pwd)/tools/make/package/mint.prop
@@ -550,6 +553,14 @@ while [[ $# -gt 0 ]]; do
       BUILD_PREF_COMPILER_VERSION="${2:-neutron}"
       shift; shift
       ;;
+    --package-name)
+      if [[ $# -lt 2 || ! "$2" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+        script_echo "E: Package name must be a non-empty filename-safe basename."
+        exit_script
+      fi
+      BUILD_KERNEL_PACKAGE_NAME="$2"
+      shift; shift
+      ;;
     -h|--help)
       SCRIPT_SHOW_HELP='true'
       shift
@@ -622,6 +633,20 @@ if [[ -z ${BUILD_ANDROID_PLATFORM} ]]; then
 	BUILD_ANDROID_PLATFORM=11
 fi
 
+case "${BUILD_ANDROID_PLATFORM}" in
+	11|12|13|14)
+		CONFIG_ANDROID_PLATFORM=${BUILD_ANDROID_PLATFORM}
+		;;
+	15|16)
+		CONFIG_ANDROID_PLATFORM=14
+		script_echo "WARNING: Android ${BUILD_ANDROID_PLATFORM} is experimental and reuses the Android 14 Mali and partial-deknox fragments."
+		;;
+	*)
+		script_echo "E: Android platform ${BUILD_ANDROID_PLATFORM} is unsupported; available source profiles are 11 through 16."
+		exit_script
+		;;
+esac
+
 if [[ ${BUILD_KERNEL_CODE} == "aosp" ]]; then
 	FILE_KERNEL_CODE='AOSP'
 elif [[ ${BUILD_KERNEL_CODE} == "oneui" ]]; then
@@ -631,6 +656,18 @@ else
 fi
 
 set_file_name
+if [[ -n ${BUILD_KERNEL_PACKAGE_NAME:-} ]]; then
+	FILE_OUTPUT="${BUILD_KERNEL_PACKAGE_NAME}.zip"
+fi
+
+if [[ ${BUILD_KERNEL_KSU} == 'true' ]]; then
+	BUILD_KERNEL_PACKAGE_TYPE='KernelSU'
+elif [[ ${BUILD_KERNEL_MAGISK} == 'true' ]]; then
+	BUILD_KERNEL_PACKAGE_TYPE='Magisk'
+else
+	BUILD_KERNEL_PACKAGE_TYPE='Simple'
+fi
+SOVR_PACKAGE_NAME="${FILE_OUTPUT%.zip}"
 
 if [[ ${BUILD_KERNEL_CODE} == 'recovery' ]]; then
 	BUILD_KERNEL_OUTPUT="${ORIGIN_DIR}/Image"
@@ -648,6 +685,7 @@ else
 	script_echo "   Kernel version:     ${VERSION}.${PATCHLEVEL}.${SUBLEVEL}"
 	script_echo "   Android version:    ${BUILD_ANDROID_PLATFORM}"
 	script_echo "   Magisk-enabled:     ${BUILD_KERNEL_MAGISK}"
+	script_echo "   Root integration:    ${BUILD_KERNEL_PACKAGE_TYPE}"
 	script_echo "   Output ZIP file:    ${BUILD_KERNEL_OUTPUT}"
 fi
 
@@ -676,10 +714,11 @@ fi
 
 check_defconfig
 get_devicedb_info
+PLATFORM_VERSION="${BUILD_ANDROID_PLATFORM}.0.0"
 
 # All variants get semi-Knox while we're fixing compile issues
-merge_config partial-deknox-${BUILD_ANDROID_PLATFORM}
-merge_config mali-${BUILD_ANDROID_PLATFORM}
+merge_config partial-deknox-${CONFIG_ANDROID_PLATFORM}
+merge_config mali-${CONFIG_ANDROID_PLATFORM}
 merge_config variant_${BUILD_KERNEL_CODE}
 
 if [[ ${BUILD_KERNEL_KSU} == 'true' ]]; then

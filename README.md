@@ -106,6 +106,22 @@ Releases are available under [GitHub Releases](https://github.com/SOVR-Technolog
 * **`SOVR-Kernel-v4.1.AOSP_Universal_A50_KSU.zip`**
   * Tailored for **Generic System Images (GSIs)** and AOSP Android 12+ (LineageOS, Pixel Experience, CrDroid) with legacy DTB, dual MAC fallback, and BPF 5.4.186 compatibility.
 
+### Development package matrix
+
+The **SOVR Galaxy A50 Package Matrix** workflow produces separate `Simple`, `Magisk`, and `KernelSU` ZIPs for each profile. Workflow artifacts are build outputs, not GitHub Releases. A manual run can select one ROM profile, one root integration, or the full matrix.
+
+| ZIP profile prefix | Android platform | Build profile | Status |
+| --- | ---: | --- | --- |
+| `OneUI4` | 12 | One UI / Android 12 fragments | Experimental; build/package validation only |
+| `OneUI5` | 13 | One UI / Android 13 fragments | Experimental; build/package validation only |
+| `OneUI6` | 14 | One UI / Android 14 DTB and fragments | Experimental; build/package validation only |
+| `OneUI7` | 15 | Android 14 Mali and partial-deknox fragments/DTB fallback | Experimental; no Android 15-specific kernel fragments |
+| `OneUI8` | 16 | Android 14 Mali and partial-deknox fragments/DTB fallback | Experimental; no Android 16-specific kernel fragments |
+| `OneUI8.5` | 16 | Android 14 Mali and partial-deknox fragments/DTB fallback | Experimental; no Android 16-specific kernel fragments |
+| `AOSP` | 14 | Android 14 AOSP DTB and fragments | Experimental; build/package validation only |
+
+Each prefix has `-Simple.zip`, `-Magisk.zip`, and `-KernelSU.zip` variants. `Simple` disables both root integrations, `Magisk` uses the in-tree Magisk pre-root path, and `KernelSU` enables the in-tree KernelSU/SuSFS configuration. Android 15/16 builds reuse Android 14 configuration fragments and must not be interpreted as ROM compatibility claims. No matrix artifact is considered device-boot tested unless separately reported.
+
 ---
 
 ## Installation
@@ -141,13 +157,13 @@ git clone https://github.com/SOVR-Technologies/SOVR-Kernel-A50.git
 cd SOVR-Kernel-A50
 
 # Compile for Samsung One UI 6+ (Android 14) with KernelSU-Next
-./build.sh -d a50 -a 14 -v oneui -k
+./build.sh -d a50 -a 14 -v oneui -k --toolchain aosp_17
 
 # Compile for Samsung One UI 4 (Android 12) with KernelSU-Next
-./build.sh -d a50 -a 12 -v oneui -k
+./build.sh -d a50 -a 12 -v oneui -k --toolchain aosp_17
 
 # Compile for Samsung One UI 3 (Android 11) with KernelSU-Next
-./build.sh -d a50 -a 11 -v oneui -k
+./build.sh -d a50 -a 11 -v oneui -k --toolchain aosp_17
 
 # Compile for Generic System Images (AOSP)
 ./build.sh -d a50 -a 12 -v aosp -k
