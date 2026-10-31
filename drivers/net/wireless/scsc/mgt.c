@@ -332,6 +332,13 @@ mac_efs:
 #endif
 		CONFIG_SCSC_WLAN_MAC_ADDRESS_FILENAME);
 	r = mx140_request_file(sdev->maxwell_core, path_name, &e);
+	if (r != 0) {
+		/* Fallback to alternative EFS path for GSIs and custom AOSP vendors */
+		if (strcmp(CONFIG_SCSC_WLAN_MAC_ADDRESS_FILENAME, "/efs/wifi/.mac.info") != 0)
+			r = mx140_request_file(sdev->maxwell_core, "/efs/wifi/.mac.info", &e);
+		else
+			r = mx140_request_file(sdev->maxwell_core, "/mnt/vendor/efs/wifi/.mac.info", &e);
+	}
 	if (r != 0)
 		goto mac_default;
 	if (!e) {

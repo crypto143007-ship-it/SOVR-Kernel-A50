@@ -166,7 +166,7 @@ void *tz_iwio_alloc_iw_channel(unsigned int mode, unsigned int num_pages,
 
 		if ((ret = tzdev_smc_connect(mode, num_pfns))) {
 			tz_iwio_put_aux_channel();
-			tzdev_print(0, "TZDev IW buffer registration failed\n");
+			pr_err("TZDEV> ERR tz_iwio_alloc_iw_channel: TZDev IW buffer registration failed (mode=%u, ret=%d)\n", mode, ret);
 			goto pre_callback_cleanup;
 		}
 	}

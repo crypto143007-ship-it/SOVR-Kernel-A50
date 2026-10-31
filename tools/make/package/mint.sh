@@ -34,6 +34,7 @@ mount /system/
 mount /system_root/
 mount /vendor/
 mount -o rw,remount -t auto /system > /dev/null
+mount -o rw,remount -t auto /system_root > /dev/null
 mount -o rw,remount -t auto /vendor > /dev/null
 
 fresh4=0
@@ -94,17 +95,17 @@ if [ ! -z "$oneui" ] || [ ! -z "$fresh" ]; then
 	elif [ "${sdk_ver}" == "34" ] || [ "${sdk_ver}" == "35" ]; then
 		ui_print "  - One UI 6+ / Fresh 6 detected (Android 14+)!"
 		ui_print "    - Installing SOVR performance profile (Zest)..."
-		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system/etc/init/init.fresh.perf.rc
-		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system_root/system/etc/init/init.fresh.perf.rc
-		chmod 644 /system/etc/init/init.fresh.perf.rc
-		chmod 644 /system_root/system/etc/init/init.fresh.perf.rc
+		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system/etc/init/init.fresh.perf.rc 2>/dev/null || true
+		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system_root/system/etc/init/init.fresh.perf.rc 2>/dev/null || true
+		chmod 644 /system/etc/init/init.fresh.perf.rc 2>/dev/null || true
+		chmod 644 /system_root/system/etc/init/init.fresh.perf.rc 2>/dev/null || true
 	else
 		ui_print "  - One UI 4/5 / Fresh 4/5 detected (Android 12/13)!"
 		ui_print "    - Installing SOVR performance profile (Zest)..."
-		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system/etc/init/init.fresh.perf.rc
-		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system_root/system/etc/init/init.fresh.perf.rc
-		chmod 644 /system/etc/init/init.fresh.perf.rc
-		chmod 644 /system_root/system/etc/init/init.fresh.perf.rc
+		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system/etc/init/init.fresh.perf.rc 2>/dev/null || true
+		cp -rf $AK_FOLDER/files_fresh/system/etc/init/init.fresh.perf.rc /system_root/system/etc/init/init.fresh.perf.rc 2>/dev/null || true
+		chmod 644 /system/etc/init/init.fresh.perf.rc 2>/dev/null || true
+		chmod 644 /system_root/system/etc/init/init.fresh.perf.rc 2>/dev/null || true
 	fi
 else
 	vendor_fs_info=$($BB blkid /dev/block/platform/13520000.ufs/by-name/vendor 2>/dev/null)
@@ -131,6 +132,13 @@ else
 		append_file ${VENDOR_INIT_RC} 'swapon_all /vendor/etc/fstab.zram' init.zram.rc
 	fi
 fi
+
+# Fix SELinux genfscon conflict on LineageOS / AOSP GSIs with Samsung vendor
+for f in /system_root/system/system_ext/etc/selinux/system_ext_sepolicy.cil /system/system_ext/etc/selinux/system_ext_sepolicy.cil; do
+	if [ -f "$f" ]; then
+		sed -i -e '/genfscon iso9660/d' -e '/genfscon udf/d' "$f"
+	fi
+done
 
 umount /system
 umount /system_root
