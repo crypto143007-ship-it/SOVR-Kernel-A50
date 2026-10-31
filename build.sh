@@ -192,7 +192,7 @@ fill_magisk_config() {
 
 	# Create a unique random seed per-build
 	script_echo "   - Generating a unique random seed for this build..."
-	RANDOMSEED=$(tr -dc 'a-f0-9' < /dev/urandom | head -c 16)
+	RANDOMSEED=$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')
 	echo "RANDOMSEED=0x$RANDOMSEED" >> "$MAGISK_USR_DIR/backup_magisk"
 }
 
