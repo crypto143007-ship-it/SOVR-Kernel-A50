@@ -639,6 +639,8 @@ jobs:
     name: Release files and configs
     if: ${{ !contains(github.event.head_commit.message, '[skip rel]') }}
     needs: [oneui-s-e, oneui-s-p, oneui-r-e, oneui-r-p, aosp-s-e, aosp-s-p, aosp-r-e, aosp-r-p]
+    permissions:
+      contents: write
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: true
@@ -669,14 +671,14 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: Upload release
-      uses: Hs1r1us/Release-AIO@v1.0
+    - name: Publish release
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        # The name of the tag
-        tag_name: xbeta-${{ github.run_number }}_a50dx
-        prerelease: true
-        release_name: Galaxy A50 (beta-${{ github.run_number }})
-        body_path: "./tools/make/release/a50-development.md"
-        asset_files: './release'
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -euo pipefail
+        gh release create "xbeta-${GITHUB_RUN_NUMBER}_a50dx" ./release/* \
+          --repo "$GITHUB_REPOSITORY" \
+          --target "$GITHUB_SHA" \
+          --prerelease \
+          --title "Galaxy A50 (beta-${GITHUB_RUN_NUMBER})" \
+          --notes-file "./tools/make/release/a50-development.md"

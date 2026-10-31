@@ -7,7 +7,7 @@ on:
       - 'android-*'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   prepare-toolchain:
@@ -516,6 +516,8 @@ jobs:
     name: Release files and configs
     if: ${{ !contains(github.event.head_commit.message, '[skip rel]') }}
     needs: [oneui-s-m, oneui-s-n, oneui-r-m, oneui-r-n, aosp-s-m, aosp-s-n, aosp-r-m, aosp-r-n]
+    permissions:
+      contents: write
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: true
@@ -538,14 +540,14 @@ jobs:
           set -eo pipefail
           rm -rf ./release/kernel_config_*.txt
 
-    - name: Upload release
-      uses: Hs1r1us/Release-AIO@v1.0
+    - name: Publish release
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        # The name of the tag
-        tag_name: mainline-${{ github.run_number }}_a50dx
-        prerelease: true
-        release_name: Mint Stable
-        body_path: "./tools/make/release/a50-release.md"
-        asset_files: './release'
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -euo pipefail
+        gh release create "mainline-${GITHUB_RUN_NUMBER}_a50dx" ./release/* \
+          --repo "$GITHUB_REPOSITORY" \
+          --target "$GITHUB_SHA" \
+          --prerelease \
+          --title "Mint Stable" \
+          --notes-file "./tools/make/release/a50-release.md"
