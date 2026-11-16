@@ -190,3 +190,66 @@ Finish the source/configuration and packaging preservation inventory, especially
 - This session remained read-only until this status-document update; no kernel source, workflow, config, installer, or packaging file was changed.
 - Do not add a blanket `set -u` to `build.sh`: the script references optional variables that may be unset. Any pipeline correction must account for expected nonzero commands and preserve interactive behavior. Prefer explicit failure checks or narrowly scoped `set -o pipefail` plus controlled error handling after a clean baseline is reproduced.
 - Next: trace the full build function call order, device database, variant fragment merge implementation, DTB/DTBO configuration, AnyKernel installer and rollback behavior; compare the two A50 defconfigs and all merged fragments; then reproduce the 4.14.357 build with the actual pinned toolchain provenance. No Linux 5.1 source replacement is authorized by the current evidence.
+
+
+## Session update — 2026-11-16 (build/configuration and installer preservation audit)
+
+### Live branch snapshot
+
+- Default branch `main`: `e87fe99406053025d97b361fe18cc8faf6e416c6`.
+- Assessment branch observed at the start of this audit: `172d8b726b467234432a30f50b0aca60f753a2ae`.
+- The assessment branch still contains the conventional Linux 4.14 tree and the two existing workflows; no Linux 5.1 source has been introduced.
+- The current branch root contains `MIGRATION_STATUS.md`, `build.sh`, `build.config.universal9610_pqr`, the A50 device database, two A50 defconfigs and the existing kernel/configuration/package directories.
+- GitHub Actions remains at zero observed workflow runs. Do not treat absence of runs as evidence that the workflow definitions are valid.
+
+### Build entry point and effective A50 configuration
+
+- `build.sh` explicitly selects `exynos9610-a50_core_defconfig` for device `a50`; it does not select `exynos9610-a50_default_defconfig` in the normal A50 build path.
+- The selected core config is 5,798 lines and has generated header `Linux/arm64 4.14.194`; the alternative default config is 5,799 lines and has generated header `Linux/arm64 4.14.113`. The top-level Makefile remains the source of the 4.14.357 kernel version. These are config provenance discrepancies requiring investigation, not proof that the compiled release is 4.14.194 or 4.14.113.
+- A programmatic symbol comparison found **510 differing config symbols** between core and default. This is not a harmless header-only difference. Important differences include:
+  - Core enables PSI, ZRAM with ZSTD default, ZRAM entropy, ZRAM writeback, LRU/SQZR writeback and LRU_GEN/MGLRU; the default config does not show those same settings.
+  - Core enables the Energy Adaptive CPU governor by default and has schedutil available; default selects schedutil as default.
+  - Core disables Android LMK; default enables `CONFIG_ANDROID_LOW_MEMORY_KILLER`.
+  - Core enables ARM64 crypto; default disables it.
+  - Core enables Exynos thermal devfreq and selected SCSC NAPI/low-latency options; default differs.
+  - Default enables Exynos FMP/FIPS-related options, ITMON/CORESIGHT, and an alternate Mali DDK config family; core differs.
+  - Both retain important Exynos platform, Android Binder, F2FS, EROFS, and KernelSU/SuSFS configuration entries, but their detailed feature selection is not equivalent.
+- The build script then appends the following fragments in order: Android-version-specific partial de-Knox, Android-version-specific Mali, ROM variant, KernelSU/SuSFS or non-root, SELinux mode, and Magisk/non-root. The effective final configuration therefore cannot be inferred from either base defconfig alone. Preserve the exact merge order and capture the generated `.config` in a clean build before deciding migration settings.
+- The A50 device database file `Documentation/device-db/a50.sh` supplies board `SRPRL05B007KU`, base `0x10000000`, page size 2048, kernel offset `0x00008000`, ramdisk/second offsets `0xf0000000`, tags offset `0x00000100`, boot header version 1, SHA-1 DTB hash type, platform version 12.0.0 and patch level 2022-09. These are current script inputs, not independently verified device boot-image metadata; validate against the actual stock/known-good boot image before altering.
+- The selected core config includes `CONFIG_PSI=y`, `CONFIG_LRU_GEN=y`, `CONFIG_LRU_GEN_ENABLED=y`, `CONFIG_ZRAM=y`, `CONFIG_ZRAM_DEF_COMP_ZSTD=y`, `CONFIG_ZRAM_WRITEBACK=y`, `CONFIG_ZRAM_LRU_WRITEBACK=y`, `CONFIG_F2FS_FS=y`, `CONFIG_EROFS_FS=y`, SCSC WLAN/BT and Exynos thermal/display/camera/platform features. The core config has `CONFIG_UFS_FS` unset; the actual Samsung UFS host integration must be traced in the Exynos-specific driver/config symbols rather than assuming generic UFS_FS represents the complete device path.
+- `build.config.universal9610_pqr` is a separate build-config entry point selecting `universal9610_pqr_defconfig`, Android clang prebuilt path `clang-r365631c`, and image/DTB/DTBO/vmlinux outputs. It is not the A50 `build.sh` defconfig path and must not be conflated with it.
+
+### Build script control-flow and failure handling
+
+- The script performs toolchain verification, optional clean/mrproper, writes a temporary config, sources device metadata, merges the fragments, selects an Android-version/ROM-specific DTS source, runs the config/build function, then builds boot.img and the ZIP.
+- The build function has multiple `make ... 2>&1 | sed ...` pipelines, and the script itself has no global `set -e` / `set -o pipefail`. This remains a confirmed build-integrity defect. Do not apply a blind `set -u`: optional variables are used in the script. Correct this in a focused change with controlled failure propagation and tests after the baseline build is reproducible.
+- The build script declares `build_dtb()` and `build_dtbo()` helper functions that invoke `tools/dtb/mkdtboimg cfg_create` against A50-specific config paths. The final visible execution sequence invokes `build_kernel`, then `build_image`, then `build_package`; it does not call those helper functions directly. The generated `arch/arm64/boot/dtb_exynos.img` is instead moved into the package as `dtb.img`. Trace Kbuild/DTB generation and helper usage before modifying this packaging flow.
+- `build_image()` creates `tools/make/boot.img` from the kernel Image and device-database boot parameters. It checks only for the resulting file after mkbootimg; the package path itself stages the raw Image and DTB, not this boot.img.
+- Toolchain selection defaults to the `neutron` selector and expects `$HOME/toolchains/neutron-clang` (described by the script as LLVM 22+) plus a cloned companion repository at `toolchain`. The fallback clone follows the moving GitLab branch `neutron` and has no pinned commit/checksum. A deterministic baseline cannot be claimed until the actual compiler binary/version and both toolchain source revisions are recorded.
+- The command-line parser supports `--ksu`, but the inspected Development workflow's `version` input still is not wired to that flag. The A50 workflow currently builds Magisk and non-root variants, not the requested KernelSU matrix.
+
+### Installer and boot-chain preservation
+
+- The current AnyKernel installer is `tools/make/package/mint.sh`. Its properties include `do.devicecheck=1`, `do.modules=0`, `do.systemless=0`, `do.cleanup=1`, and `do.cleanuponabort=0`. It targets the DTB partition path `/dev/block/platform/13520000.ufs/by-name/dtb`, declares a non-A/B device, calls `split_boot` and `flash_boot`, then flashes the DTB using `flash_generic dtb`.
+- The installer performs ROM/Android-version detection and installs distinct One UI/Fresh/AOSP assets. Android 14+ One UI/Fresh path explicitly expects EROFS system and uses the pure SOVR defaults; older One UI 3 path modifies Pageboost/RAM Plus and swap fstab/init integration; AOSP path installs ZRAM writeback overlay/init assets and adjusts vendor properties/fstab.
+- The package build stages common AnyKernel metadata and tools, then selects `files_aosp`, `files_oneui`, or `files_fresh` and version-specific init patches. It moves `arch/arm64/boot/Image` and `arch/arm64/boot/dtb_exynos.img` into the staging directory as `Image` and `dtb.img`, writes `mint.prop`, and zips the staged contents.
+- The installer and packaging are tightly coupled to current Android init/fstab behavior, vendor mount points, UFS DTB partition naming, A-only boot layout, and EROFS/F2FS assumptions. Do not replace the installer or change the image/DTB format during kernel source migration without a complete boot-chain comparison and rollback test.
+
+### Preservation decisions and newly prioritized work
+
+1. Keep both A50 defconfigs and all current config fragments unchanged until their origin and intended target variants are documented. The 510-symbol delta requires a proper semantic config comparison, not a simple choose-one decision.
+2. Resolve the 4.14.357 Makefile versus generated defconfig header discrepancy through a clean build and generated metadata, not by editing the header comments.
+3. Trace exact DTS/Kbuild targets and determine where `dtb_exynos.img` is generated; reconcile that with the unused helper functions and the installer's direct DTB flashing.
+4. Audit `tools/make/package/tools/ak3-core.sh`, all variant asset trees, boot image split/flash behavior, device assertions and abort rollback before touching packaging.
+5. Establish compiler/toolchain provenance and run a clean baseline build with the actual A50 command path.
+6. Only after baseline reproduction, implement a narrowly scoped build-failure propagation fix and a CI-only validation workflow separate from release publication. Keep `main` untouched.
+
+### Validation status
+
+- Source/build-script/configuration/installer inspection: **performed (static repository inspection only)**.
+- Effective generated `.config`: **not captured**.
+- Linux 4.14.357 baseline compilation: **not performed**.
+- Linux 5.1 compilation: **not started**.
+- ZIP/boot image validation: **not performed**.
+- Physical device boot and daily-driver testing: **not performed**.
+- No repository source, workflow, config, installer or package file was modified in this session; this update is documentation only.
