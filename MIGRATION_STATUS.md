@@ -91,8 +91,8 @@ Complete repository/tree and workflow discovery, then finish the 4.14 functional
 ### Repository and branch verification
 
 - Recursive Git tree query completed successfully for the current `main` tree: **72,306 entries**, not truncated.
-- The repository has two branches in the current branch listing: `main` at `e87fe99406053025d97b361fe18cc8faf6e416c6` and `migration/linux-5.1-assessment` at `c50df5d1a97442f853ef3aa13b753fec77046168`.
-- Compare result: migration branch is **4 commits ahead, 0 behind** main. Its aggregate change remains only the added/updated `MIGRATION_STATUS.md`; no kernel source migration has occurred on that branch.
+- The repository has two branches in the current branch listing: `main` at `e87fe99406053025d97b361fe18cc8faf6e416c6` and `migration/linux-5.1-assessment` at `2f93d295da6526f1e46adbbc8ca66b26dab8384f`.
+- Compare result: migration branch is **5 commits ahead, 0 behind** main. Its aggregate change remains only the added/updated `MIGRATION_STATUS.md`; no kernel source migration has occurred on that branch.
 - Root inventory confirms a complete conventional kernel source layout plus SOVR/Fresh build and packaging infrastructure. Top-level device-specific inputs include `build.config.universal9610_pqr`, `Documentation/device-db/a50.sh`, `arch/arm64/configs/exynos9610-a50_core_defconfig`, and `exynos9610-a50_default_defconfig`.
 - The two workflow files are `.github/workflows/development.yml` and `.github/workflows/galaxy-a50.yml`.
 - GitHub Actions API returned `total_count: 0` workflow runs. Repository releases API returned an empty list. The tags endpoint was not available through the current GitHub fetch surface, so tag inventory remains unverified.
@@ -133,3 +133,29 @@ The current `drivers/misc/tzdev/tz_deploy_tzar.c` embeds `startup.tzar` and `sta
 - Then complete the selected-config/fragment diff, installer/DTB boot-chain inventory, and full Samsung driver ownership map.
 - The first safe implementation candidate is a focused CI correctness fix for pipeline failure propagation plus a real KSU workflow input, but only after regression-safe review. Keep changes isolated on `migration/linux-5.1-assessment`; do not touch `main`.
 - No files outside this status document were modified in this session. No build, static analysis, boot test, or physical-device test was performed.
+
+## Session update — 2026-11-16 (continuation verification)
+
+### Live Git state re-check
+
+- `main` remains at `e87fe99406053025d97b361fe18cc8faf6e416c6`.
+- `migration/linux-5.1-assessment` now points to `2f93d295da6526f1e46adbbc8ca66b26dab8384f` (`docs(migration): record live source and CI audit findings`).
+- GitHub compare reports the migration branch **5 commits ahead, 0 behind** main. Its complete diff against main is still only `MIGRATION_STATUS.md` (135 additions); no kernel source, build script, workflow, defconfig, installer or package file has been changed on the migration branch.
+- The branch listing currently returns exactly `main` and `migration/linux-5.1-assessment`.
+- Repository-scoped PR listing and open-issue search return no entries.
+- GitHub Actions run API returns `total_count: 0`. The releases endpoint for this repository returns an empty list. Tag enumeration is still unavailable through the current API surface (the Git refs/tags endpoint returned 404), so do not infer that no tags exist.
+- Main's recursive Git tree was independently fetched with `truncated=false`: **72,306 entries**. Root inventory includes the complete kernel tree, `.elts`, `.github`, SOVR/Fresh build scripts, `build.config.universal9610_pqr`, and the A50 device database.
+- The README advertises SOVR v4.2 and links release assets under the separate `SOVR-Technologies/SOVR-Kernel-A50` repository. The current `crypto143007-ship-it/SOVR-Kernel-A50` releases API is empty; therefore ZIP payloads and release provenance are not yet verified from this repository.
+
+### Build-script and workflow re-check
+
+- The live `build.sh` is 812 lines and still has no script-level `set -e` or `set -o pipefail`.
+- Nineteen critical logging pipelines were identified: toolchain clone (1), Magisk update (1), config/build make invocations (14), ZIP creation (1), and clean/mrproper (2). These remain potential false-success paths because the build script runs as a separate process from the workflow shell. This confirms the issue but does not yet constitute a fix.
+- `.github/workflows/development.yml` has only `workflow_dispatch`; its `version` input is described as “Build KSU”, but no invocation consumes the input and all build calls select Magisk or no KSU flag.
+- `.github/workflows/galaxy-a50.yml` has manual dispatch and a restricted push trigger; neither workflow currently provides a pull-request trigger for migration-branch validation.
+- Both workflows contain release-writing operations, so `contents: write` cannot be reduced safely without first separating artifact-only validation from release publication.
+- No workflow was dispatched, no source was modified, and no build or device test was performed in this continuation. These findings remain audit evidence only.
+
+### Next action
+
+Finish the source/configuration and packaging preservation inventory, especially the two competing A50 defconfigs, all merged fragments, Mali DDK selection, DTB/DTBO generation, boot-image construction and AnyKernel3 install/rollback logic. Then reproduce the existing 4.14.357 build with its actual toolchain and record the generated `.config`, `UTS_RELEASE`, image metadata and package contents. Only after this baseline is reproducible should the focused pipeline-failure fix and KSU workflow-input correction be implemented and tested on this migration branch.
