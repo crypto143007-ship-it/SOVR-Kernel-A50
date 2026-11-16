@@ -159,3 +159,34 @@ The current `drivers/misc/tzdev/tz_deploy_tzar.c` embeds `startup.tzar` and `sta
 ### Next action
 
 Finish the source/configuration and packaging preservation inventory, especially the two competing A50 defconfigs, all merged fragments, Mali DDK selection, DTB/DTBO generation, boot-image construction and AnyKernel3 install/rollback logic. Then reproduce the existing 4.14.357 build with its actual toolchain and record the generated `.config`, `UTS_RELEASE`, image metadata and package contents. Only after this baseline is reproducible should the focused pipeline-failure fix and KSU workflow-input correction be implemented and tested on this migration branch.
+
+## Session update — 2026-11-16 (live repository and build-path verification)
+
+### Current live refs and repository identity
+
+- Default branch `main`: `e87fe99406053025d97b361fe18cc8faf6e416c6`.
+- Assessment branch `migration/linux-5.1-assessment`: `3df53c48ff6188369c94c78916a2009a484a01c5`.
+- GitHub compare: **7 commits ahead, 0 behind** main; aggregate diff still consists only of `MIGRATION_STATUS.md`. No kernel source, defconfig, build script, workflow, installer, or package content has been changed on the assessment branch.
+- The repository is a public fork of `SOVR-Technologies/SOVR-Kernel-A50`; preserve the user's fork and its independent history. Parent repository metadata reports a later update on 2026-11-16, so upstream/fork divergence should be reviewed before any future sync. Do not merge or rebase automatically.
+- Recursive `main` tree fetch completed with `truncated=false`: **72,306 entries / 67,449 files**. Root includes conventional kernel directories, `.elts`, `.github`, `build.sh`, `build_all_v35.sh`, `build_all_v36.sh`, and `build.config.universal9610_pqr`.
+- Live branch listing contains only `main` and `migration/linux-5.1-assessment`.
+- Actions API: `total_count=0`; release list: empty. The GitHub fetch surface rejects the tags endpoint, so tag inventory remains **unverified**, not empty.
+- PR list returned empty. The repository metadata says Issues are disabled (`has_issues=false)); issue endpoint returning no results must not be interpreted as a complete issue-history audit.
+- `MIGRATION_PLAN.md` does not exist on the assessment branch yet. Do not assume it exists or overwrite/create it before the assessment is ready.
+
+### Workflow and build-path details confirmed
+
+- `.github/workflows/development.yml` and `.github/workflows/galaxy-a50.yml` are both present on main and unchanged on the assessment branch.
+- Development workflow is manual-dispatch only. Its `version` input says “Build KSU” but is not referenced by the build invocations; those invocations choose Magisk or no root option.
+- Galaxy A50 workflow triggers on manual dispatch and pushes to `android-*`; it has eight ROM/root build jobs plus a release aggregation job. It does not currently trigger on pull requests or general development-branch pushes.
+- Both workflows perform release publication, explaining why `contents: write` cannot be removed from those release jobs without separating artifact-only CI from release publication.
+- `build.sh` uses `exynos9610-a50_core_defconfig` for the A50 build path, then merges partial de-Knox, Mali, variant, and SELinux fragments. The KSU path appends KernelSU/SuSFS config symbols; this is configuration injection, not proof that the KSU source hooks are compatible with Linux 5.1.
+- The build script has 14 make/configuration pipelines ending in `sed`, plus toolchain clone, Magisk update, ZIP creation, clean and mrproper pipelines. It has no script-level `set -e` or `pipefail`. Parent workflow shell options do not propagate into the separately executed `./build.sh` process.
+- Packaging stages variant-specific installer assets in a temporary directory, then moves `arch/arm64/boot/Image` and `arch/arm64/boot/dtb_exynos.img` into the staged package before ZIP creation. DTB/DTBO helper functions and exact call order still require full trace; do not change the package format based on partial inspection.
+- `build_dtb()` and `build_dtbo()` invoke the repository's `tools/dtb/mkdtboimg` helper with A50-specific config files. The actual output dependency chain must be verified against the device database and installer before any packaging edits.
+
+### Current decision and next work
+
+- This session remained read-only until this status-document update; no kernel source, workflow, config, installer, or packaging file was changed.
+- Do not add a blanket `set -u` to `build.sh`: the script references optional variables that may be unset. Any pipeline correction must account for expected nonzero commands and preserve interactive behavior. Prefer explicit failure checks or narrowly scoped `set -o pipefail` plus controlled error handling after a clean baseline is reproduced.
+- Next: trace the full build function call order, device database, variant fragment merge implementation, DTB/DTBO configuration, AnyKernel installer and rollback behavior; compare the two A50 defconfigs and all merged fragments; then reproduce the 4.14.357 build with the actual pinned toolchain provenance. No Linux 5.1 source replacement is authorized by the current evidence.
