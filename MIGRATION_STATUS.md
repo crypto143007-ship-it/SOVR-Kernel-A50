@@ -84,3 +84,52 @@ The prior text in this document incorrectly stated that only `main` had been dis
 ## Next continuation point
 
 Complete repository/tree and workflow discovery, then finish the 4.14 functionality-preservation inventory. Resolve the defconfig provenance discrepancy and reproduce the existing baseline build. Only then finalize the Linux 5.1 migration architecture. Do not replace or rebase kernel source until the compatibility assessment establishes a defensible source and driver-porting strategy.
+
+
+## Session update — 2026-11-16 (continued live inspection)
+
+### Repository and branch verification
+
+- Recursive Git tree query completed successfully for the current `main` tree: **72,306 entries**, not truncated.
+- The repository has two branches in the current branch listing: `main` at `e87fe99406053025d97b361fe18cc8faf6e416c6` and `migration/linux-5.1-assessment` at `c50df5d1a97442f853ef3aa13b753fec77046168`.
+- Compare result: migration branch is **4 commits ahead, 0 behind** main. Its aggregate change remains only the added/updated `MIGRATION_STATUS.md`; no kernel source migration has occurred on that branch.
+- Root inventory confirms a complete conventional kernel source layout plus SOVR/Fresh build and packaging infrastructure. Top-level device-specific inputs include `build.config.universal9610_pqr`, `Documentation/device-db/a50.sh`, `arch/arm64/configs/exynos9610-a50_core_defconfig`, and `exynos9610-a50_default_defconfig`.
+- The two workflow files are `.github/workflows/development.yml` and `.github/workflows/galaxy-a50.yml`.
+- GitHub Actions API returned `total_count: 0` workflow runs. Repository releases API returned an empty list. The tags endpoint was not available through the current GitHub fetch surface, so tag inventory remains unverified.
+- Repository-scoped pull request and open-issue queries returned no entries.
+
+### Newly verified build and CI defects / risks
+
+1. **Build-script pipeline exit masking is confirmed.** `build.sh` does not establish `set -o pipefail` or `set -e`. Its compiler/configuration commands at approximately lines 268–285, cleanup commands at 701–702, toolchain clone at 71, Magisk update at 170, and ZIP creation at 491 pipe through `sed`. The workflow's `set -eo pipefail` is in the parent Actions shell and does not automatically enable pipefail inside the separately executed `./build.sh` process. A failed `make`, clone, or zip can therefore be hidden by a successful `sed` exit unless the script explicitly handles pipeline status. This is a confirmed high-priority CI correctness defect; fix on the migration branch only after reviewing the complete script and adding a focused regression test.
+2. **The advertised Development workflow KSU input is not wired.** It declares `workflow_dispatch.inputs.version` with description “Build KSU”, but none of the build invocations references `inputs.version` or `github.event.inputs.version`. The build script does support `--ksu` (argument parser around lines 552–555), but the workflow's invocations use `--magisk` or no root flag. Thus the current input does not select KernelSU.
+3. **Workflow triggers are narrower than the requested CI design.** `development.yml` is manual-dispatch only. `galaxy-a50.yml` runs on manual dispatch and pushes to `android-*`; neither inspected workflow declares `pull_request` or general development-branch push triggers. There is no observed workflow run evidence.
+4. **Workflow permissions are broader than necessary for artifact-only CI.** Both inspected workflows declare `contents: write`; the build/artifact jobs should be reviewed for least privilege. Do not reduce permissions until checking whether any release-publishing step actually writes repository releases.
+5. **Toolchain reproducibility remains unresolved.** `build.sh` defaults to compiler selector `neutron`, checks for `$HOME/toolchains/neutron-clang`, and labels it LLVM 22+. Its fallback clones the moving GitLab `neutron` branch into a repository-local `toolchain` directory, but the Neutron-specific verification branch checks the separate home-directory path. The inspected script does not pin a commit or verify a checksum. The CI workflows install host packages but do not themselves provision and verify a pinned compiler archive/revision. Resolve this before claiming reproducible CI.
+6. **Package/build path needs careful preservation.** The script selects `exynos9610-a50_core_defconfig`, merges Android/variant fragments, conditionally appends KernelSU/SuSFS symbols, builds an Image, constructs boot image/DTB/DTBO-related outputs, and stages AnyKernel assets. The package path moves `Image` and `dtb_exynos.img` into a temporary staging directory and zips it. Preserve this behavior until installer, boot-header, DTB and rollback dependencies have been fully mapped.
+7. **KSU source is a downstream integration, not a simple config toggle.** The inspected Kconfig exposes `KSU_MANUAL_HOOK`, `KSU_KPROBES_HOOK` and numerous SuSFS options. The script forces manual hooks and disables KPROBES hooks for its KSU path. Linux 5.1 porting must verify the exact KernelSU/SuSFS source revision and hook/API compatibility; do not transplant current Kconfig fragments blindly.
+
+### Configuration provenance discrepancy — confirmed
+
+- Top-level `Makefile` identifies the source as **4.14.357**.
+- The build script selects `exynos9610-a50_core_defconfig`, whose generated-file header says **Linux/arm64 4.14.194**.
+- `exynos9610-a50_default_defconfig` has a generated-file header saying **4.14.113**.
+- The build script constructs `BUILD_DEVICE_CONFIG=exynos9610-a50_core_defconfig`; the default defconfig is not selected by this path.
+- These generated header comments are provenance clues, not proof that the effective built kernel reports those releases. Investigate config ancestry and verify the resulting `.config`, `include/generated/utsrelease.h`, `kernelversion`, and built image metadata in a clean baseline build. Do not rewrite the headers or defconfigs merely to make the versions appear consistent.
+
+### Confirmed preserved features in the selected core defconfig
+
+The inspected core defconfig includes PSI, LRU_GEN/MGLRU, ZRAM with ZSTD default, ZRAM entropy, ZRAM writeback, LRU/SQZR writeback, Exynos thermal/ACPM, Exynos display/camera blocks, SCSC WLAN/Bluetooth, F2FS encryption and extensive Exynos 9610 platform options. This is a feature-preservation checklist, not a statement that every feature has been hardware-tested.
+
+The selected defconfig also enables the Exynos/Samsung-specific driver families that make a generic upstream 5.1 replacement unsafe without substantial downstream porting. The alternative default defconfig differs materially (including a different generated kernel version header and Mali configuration); both configs must be diffed and traced to the intended ROM/variant before any migration.
+
+### TZDEV source detail
+
+The current `drivers/misc/tzdev/tz_deploy_tzar.c` embeds `startup.tzar` and `startup_old.tzar` into `.rodata` using assembler `.incbin`, then asynchronously deploys the primary container and falls back to the older container after failure. The comments associate the fallback with non-NFC A505F models. This is important device-specific code and must be preserved and validated against the actual A505F secure OS; source comments and fallback logic do not by themselves prove deployment succeeds on the user's handset.
+
+### Current engineering decision
+
+- Do **not** start source replacement yet.
+- First reproduce the 4.14.357 baseline from the actual `build.sh` path, inspect generated config and kernel release metadata, and capture the exact toolchain and package outputs.
+- Then complete the selected-config/fragment diff, installer/DTB boot-chain inventory, and full Samsung driver ownership map.
+- The first safe implementation candidate is a focused CI correctness fix for pipeline failure propagation plus a real KSU workflow input, but only after regression-safe review. Keep changes isolated on `migration/linux-5.1-assessment`; do not touch `main`.
+- No files outside this status document were modified in this session. No build, static analysis, boot test, or physical-device test was performed.
