@@ -139,8 +139,8 @@ The current `drivers/misc/tzdev/tz_deploy_tzar.c` embeds `startup.tzar` and `sta
 ### Live Git state re-check
 
 - `main` remains at `e87fe99406053025d97b361fe18cc8faf6e416c6`.
-- `migration/linux-5.1-assessment` now points to `2f93d295da6526f1e46adbbc8ca66b26dab8384f` (`docs(migration): record live source and CI audit findings`).
-- GitHub compare reports the migration branch **5 commits ahead, 0 behind** main. Its complete diff against main is still only `MIGRATION_STATUS.md` (135 additions); no kernel source, build script, workflow, defconfig, installer or package file has been changed on the migration branch.
+- At the start of this continuation verification, `migration/linux-5.1-assessment` pointed to `2f93d295da6526f1e46adbbc8ca66b26dab8384f` (`docs(migration): record live source and CI audit findings`). The first status refresh was committed as `d6d233f77b96759ce3bdcb660d36edf1a5eb731b`; this line records the pre-refresh snapshot, not the current branch head.
+- At that pre-refresh snapshot, GitHub compare reported the migration branch **5 commits ahead, 0 behind** main. Its diff against main contained only `MIGRATION_STATUS.md`; no kernel source, build script, workflow, defconfig, installer or package file had been changed on the migration branch.
 - The branch listing currently returns exactly `main` and `migration/linux-5.1-assessment`.
 - Repository-scoped PR listing and open-issue search return no entries.
 - GitHub Actions run API returns `total_count: 0`. The releases endpoint for this repository returns an empty list. Tag enumeration is still unavailable through the current API surface (the Git refs/tags endpoint returned 404), so do not infer that no tags exist.
