@@ -2,68 +2,85 @@
 
 Last verified: 2026-11-16
 Project: Samsung Galaxy A50 SM-A505F / Exynos 9610
-Target: Linux 5.1 (explicitly retained; no version substitution)
+Requested target: Linux 5.1 (must not be silently substituted)
 
 ## Current phase
 
 **Phase 0 — Repository discovery: IN PROGRESS**
 
-No kernel source, defconfig, build script, installer, branch, tag, or release has been modified by this migration session. This status file is the only migration-session change.
+This session performed read-only inspection. No kernel source, defconfig, build script, installer, workflow, branch, tag, or release was modified. The migration branch already contains this status document; its contents have been reconciled against the live repository where evidence was available.
 
-## Verified repository baseline
+## Live repository state
 
 - Repository: https://github.com/crypto143007-ship-it/SOVR-Kernel-A50
-- Default branch at discovery: `main`
-- Baseline commit: `e87fe99406053025d97b361fe18cc8faf6e416c6`
-- Latest commit message: `docs(readme): update documentation and package matrix for SOVR Kernel v4.2`
-- Repository metadata reports public visibility and read/write permissions for the connected GitHub identity.
-- Branch discovery returned `main`; a second page returned no further branches.
-- Pull-request search returned no PRs; issue search returned no issues.
-- Commit combined-status query returned no status entries.
-- Commit workflow-run lookup returned no PR-triggered workflow runs. This endpoint is not a complete repository-wide workflow inventory.
-- Root migration documents `MIGRATION_STATUS.md` and `MIGRATION_PLAN.md` did not exist when checked.
+- Default branch: `main`
+- Main HEAD observed through commit search: `e87fe99406053025d97b361fe18cc8faf6e416c6`
+- Main HEAD message: `docs(readme): update documentation and package matrix for SOVR Kernel v4.2`
+- Latest observed commit time: 2026-11-15 02:29:12 UTC
+- Repository is public and available through the connected GitHub integration.
+- Branches discovered: `main`, `migration/linux-5.1-assessment`.
+- GitHub compare confirms migration branch is **1 commit ahead, 0 behind** main; the only difference returned is an added `MIGRATION_STATUS.md`.
+- No pull requests or issues were returned by the repository-scoped searches.
+- The repository integration exposes commit/file/PR/issue and selected workflow-run operations, but does not expose a repository-wide workflow-list or directory-tree operation. Consequently, complete branch/tag/workflow/release inventory remains pending.
+- A commit-workflow-run lookup is PR-triggered-only and is not sufficient to conclude that no Actions runs exist.
 
-## Confirmed source observations
+## Verified source observations on main
 
-1. Top-level `Makefile` declares Linux `4.14.357`.
-2. README documents SOVR v4.2 Final and describes OpenELA 4.14.357 plus ELTS backports, Clang 23.1.5, KernelSU-Next 3.4.2, SuSFS 1.5.5, MGLRU, ZSTD ZRAM, EROFS, F2FS, Samsung SCSC, and Exynos UFS customizations. These README statements remain claims until independently verified.
-3. `build.sh` selects `exynos9610-a50_core_defconfig`.
-4. That defconfig's generated header says Linux/arm64 4.14.194. This is a provenance/version-header discrepancy requiring investigation; it does not override the top-level Makefile version.
-5. The defconfig enables PSI, LRU_GEN and LRU_GEN_ENABLED, ZRAM with ZSTD, ZRAM entropy, ZRAM writeback, ZRAM_LRU_WRITEBACK, SCSC WLAN/BT, TZDEV/TZAR deployment, and Exynos UFS components.
-6. The ZRAM driver contains custom backing-device, writeback-limit, idle/huge/page writeback, LRU/SQZR, mm_stat, bd_stat, and debug_stat paths.
-7. `drivers/misc/tzdev/tz_deploy_tzar.c` embeds primary and fallback TZAR blobs in `.rodata`, deploys asynchronously using `tzdev_deploy_tzar`, retries secure-loader connections, and falls back from `startup.tzar` to `startup_old.tzar`. Secure-world rejection is translated to `-EINVAL`.
-8. `build.sh` contains build, clean, toolchain-download and ZIP pipelines piped through `sed`, without establishing `set -o pipefail` in its opening section. These pipelines can mask the left-hand command's exit status.
-9. `build.sh` defaults to a toolchain selector named `neutron` and looks for `$HOME/toolchains/neutron-clang` described by the script as LLVM 22+, while the current README advertises Clang 23.1.5. The exact toolchain actually used by the latest release build is not yet independently established.
-10. `build.sh` downloads a fallback toolchain from a moving GitLab branch and does not show a pinned commit or integrity checksum in the inspected function.
+1. Top-level `Makefile` declares:
+   - `VERSION = 4`
+   - `PATCHLEVEL = 14`
+   - `SUBLEVEL = 357`
+2. `arch/arm64/configs/exynos9610-a50_core_defconfig` exists. Its generated header identifies **Linux/arm64 4.14.194**, which conflicts with the top-level 4.14.357 Makefile version. This is a provenance/version-header discrepancy requiring investigation; the header alone does not prove the effective built kernel version.
+3. The README describes SOVR v4.2 Final, OpenELA 4.14.357 plus ELTS backports, Clang 23.1.5, KernelSU-Next 3.4.2, SuSFS 1.5.5, MGLRU, ZSTD ZRAM, EROFS, F2FS, Samsung SCSC, and Exynos UFS customizations. README statements are project claims until independently checked against all source, configs, release packages and hardware evidence.
+4. The README advertises eight build packages across Android 11, 12 and 14 variants. The One UI 6+ Android 14 package is described as hardware validated; older One UI and AOSP packages are described as community beta. These claims are not independently verified in this audit.
+5. The inspected opening section of `build.sh`:
+   - Selects `ARCH=arm64` and the Fresh/Mint-derived build framework.
+   - Defaults to a compiler selector named `neutron`.
+   - Looks for `$HOME/toolchains/neutron-clang` and describes it as LLVM 22+.
+   - Falls back to cloning `TenSeventy7/exynos9610_toolchains_fresh` from the moving `neutron` branch.
+   - Does not show a pinned toolchain commit or integrity checksum in the inspected download function.
+   - Contains pipelines such as `git clone ... | sed` and Magisk update piped through `sed`; the inspected opening section does not establish `pipefail`. The complete script still needs a line-by-line audit before determining every affected command.
+6. The inspected ZRAM Kconfig defines LZO, LZO-RLE, ZSTD and LZ4 default compressor choices, ZRAM writeback, and custom LRU writeback/SQZR options.
+7. The inspected `drivers/block/zram/zram_drv.c` includes custom dependencies and structures for backing-device support. The full implementation and its locking, accounting, and reclaim interactions remain to be audited.
+8. The inspected A50 defconfig enables PSI, LRU_GEN/MGLRU-related options, ZRAM with ZSTD and writeback-related options, ARM64 crypto, Samsung platform options, and EROFS features. A full config inventory is still pending.
+9. `drivers/misc/tzdev/tz_deploy_tzar.c` embeds both `startup.tzar` and `startup_old.tzar` in `.rodata`, deploys asynchronously using `tzdev_deploy_tzar`, retries secure-loader connections, and attempts the older container after primary failure. Secure OS rejection is mapped to `-EINVAL`. This is a source-level observation, not proof of a universal A505F boot fix.
+10. The source tree and README document substantial Samsung downstream functionality. A generic upstream Linux 5.1 tree will not preserve these features automatically.
 
-## Preliminary risk observations
+## Branch and status-document reconciliation
 
-- Linux 5.1 is an end-of-life upstream series. It must not be represented as a security-maintained target without a separately documented downstream patch-maintenance strategy.
-- Android's published Android Common Kernel compatibility matrix does not list Linux 5.1 as a supported/tested kernel for Android 12–16. This is a compatibility warning, not proof that a legacy non-GKI Samsung vendor kernel cannot boot a custom ROM.
-- The existing 4.14 tree contains substantial downstream functionality that must be carried deliberately; a clean upstream 5.1 tree will not preserve it automatically.
-- MGLRU is a backport in this 4.14 tree, not a native 4.14 feature. It requires explicit forward-port analysis.
-- Samsung SCSC, TZDEV, Exynos UFS, Mali, display, camera, multimedia, power and thermal integration remain unverified for Linux 5.1.
+The prior text in this document incorrectly stated that only `main` had been discovered and that migration documents did not exist. Live branch discovery and comparison now confirm `migration/linux-5.1-assessment` exists and contains this document as its sole change over main. This corrected entry supersedes those earlier statements.
+
+## Preliminary Linux 5.1 feasibility position
+
+- Linux 5.1 is the explicit requested target; no alternative version has been selected.
+- Linux 5.1 is an old, end-of-life upstream series and cannot be treated as security-maintained without a separately resourced downstream patch policy.
+- Google's current Android Common Kernel compatibility matrix lists supported/tested Android branches such as 5.10, 5.15 and 6.1 for the relevant Android platform releases, but does not list 5.1. This is a GKI/ACK compatibility warning, not proof that a legacy non-GKI Samsung vendor kernel cannot boot.
+- The practical path, if feasible, is a controlled forward-port of Samsung downstream device support onto the requested 5.1 base, with explicit porting and validation of each subsystem.
+- No source-level feasibility conclusion can yet be made for Mali, display, camera, multimedia, SCSC, UFS, TZDEV, charging, thermal, suspend/resume, KernelSU or SuSFS. Their APIs and vendor dependencies must be mapped before source migration.
+- Do not begin wholesale replacement or remove any current driver before the compatibility matrix and source ancestry are established.
 
 ## Build and hardware validation
 
+- Linux 4.14.357 baseline build reproduced: NOT VERIFIED.
 - Linux 5.1 build: NOT STARTED.
-- Existing baseline build reproduced in CI: NOT VERIFIED.
+- Full CI workflow inventory: NOT AVAILABLE THROUGH THE CURRENT REPOSITORY TOOL SURFACE; continue through an available GitHub Actions UI/API path if exposed later.
 - Linux 5.1 static validation: NOT STARTED.
 - Physical Galaxy A50 boot test: NOT PERFORMED.
-- Daily-driver test: NOT PERFORMED.
+- Daily-driver validation: NOT PERFORMED.
 - No kernel has been flashed by this project session.
 
 ## Outstanding Phase 0 / Phase 1 work
 
-1. Obtain a complete root/tree inventory and enumerate all branches, tags, release assets, workflows, and build artifacts.
-2. Identify the actual CI workflow files and inspect their triggers, permissions, inputs, toolchain provisioning, logs, and artifact history.
-3. Inspect all defconfigs and configuration fragments; establish which file is the canonical A50 baseline for each Android variant.
-4. Trace build.sh, device database, DTB generation, boot-image construction, AnyKernel3 staging, and install/rollback behavior end to end.
-5. Inventory KernelSU-Next and SuSFS source revisions and dependencies.
-6. Audit MGLRU, PSI, OPLUS_MM_HACKS, ZRAM/SQZR writeback, EROFS, F2FS, UFS, Mali, SCSC, TZDEV, CPU/thermal, display/camera/audio and other Samsung drivers.
-7. Reconcile README claims with source, release ZIP contents, and actual test evidence.
-8. Establish a clean, reproducible Linux 4.14.357 baseline build before migration work.
+1. Obtain complete root/tree inventory and enumerate all branches, tags, release assets, workflows, and build artifacts.
+2. Inspect all build scripts end-to-end, including selected defconfigs, fragments, device database, DTB generation, boot image handling, AnyKernel3 staging, install and rollback.
+3. Identify actual GitHub Actions workflow files and inspect triggers, permissions, inputs, toolchain provisioning, logs, and artifacts.
+4. Inventory all defconfigs and fragments and identify canonical configs for each ROM/Android target.
+5. Reconcile the 4.14.357 Makefile versus 4.14.194 defconfig generated-header discrepancy.
+6. Trace KernelSU-Next and SuSFS source revisions, patch dependencies, hooks and API assumptions.
+7. Audit MGLRU, PSI, OPLUS_MM_HACKS, ZRAM/SQZR writeback, EROFS, F2FS, UFS, Mali, SCSC, TZDEV, CPU/thermal, display/camera/audio and other Samsung drivers.
+8. Reconcile README claims with source, release ZIP contents, CI evidence and actual hardware test evidence.
+9. Establish a clean, reproducible Linux 4.14.357 baseline build before migration work.
 
 ## Next continuation point
 
-Complete repository/tree and workflow discovery, then finish the 4.14 functionality-preservation inventory. Do not replace or rebase the kernel source until the Linux 5.1 feasibility assessment identifies a defensible source and driver-porting strategy.
+Complete repository/tree and workflow discovery, then finish the 4.14 functionality-preservation inventory. Resolve the defconfig provenance discrepancy and reproduce the existing baseline build. Only then finalize the Linux 5.1 migration architecture. Do not replace or rebase kernel source until the compatibility assessment establishes a defensible source and driver-porting strategy.
