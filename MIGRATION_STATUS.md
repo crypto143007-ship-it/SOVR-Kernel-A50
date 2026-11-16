@@ -258,7 +258,7 @@ Finish the source/configuration and packaging preservation inventory, especially
 ## Continuation re-check — 2026-11-16 16:20 UTC
 
 ### Current ref verification
-- Rechecked the live branch list: `main` remains at `e87fe99406053025d97b361fe18cc8faf6e416c6`; `migration/linux-5.1-assessment` remains at `2a435274b9678d8003c31a274129c863d975ae0c`.
+- Pre-update ref snapshot: `main` was `e87fe99406053025d97b361fe18cc8faf6e416c6`; `migration/linux-5.1-assessment` was `2a435274b9678d8003c31a274129c863d975ae0c`.
 - The migration branch still contains documentation-only changes relative to main. No Linux 5.1 source tree, compatibility shim, driver port, config migration, or build workflow has been introduced.
 - The current repository contains two Actions workflows, `.github/workflows/development.yml` and `.github/workflows/galaxy-a50.yml`; the current Actions runs endpoint reports zero runs. This is not build evidence.
 
@@ -273,3 +273,5 @@ Finish the source/configuration and packaging preservation inventory, especially
 - No kernel source, defconfig, DTS/DTBO, installer, build script, workflow, or release configuration was modified.
 - No compiler was run, no baseline build was attempted, no artifact was produced, and no device operation was performed.
 - Next safe action remains: provision and pin a known-compatible baseline toolchain, then run the exact A50 One UI 14 / SOVR build path on an isolated CI branch and capture the generated `.config`, `UTS_RELEASE`, Image, DTB, boot image and ZIP contents. Only after this baseline is reproducible should the build-script error-propagation defect be changed.
+
+- Post-update verification: the status-only commit succeeded as `e51b73a79b638352feef2fbeb87c49519724c8a8`; the migration branch now points to that commit and is 10 commits ahead, 0 behind `main`. The aggregate diff against `main` remains only `MIGRATION_STATUS.md`.
