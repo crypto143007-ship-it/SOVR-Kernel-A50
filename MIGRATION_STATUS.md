@@ -19,7 +19,7 @@ This session performed read-only inspection. No kernel source, defconfig, build 
 - Latest observed commit time: 2026-11-15 02:29:12 UTC
 - Repository is public and available through the connected GitHub integration.
 - Branches discovered: `main`, `migration/linux-5.1-assessment`.
-- GitHub compare confirms migration branch is **1 commit ahead, 0 behind** main; the only difference returned is an added `MIGRATION_STATUS.md`.
+- GitHub compare initially confirmed the migration branch was 1 commit ahead of main. After this session's documentation update, it is **2 commits ahead, 0 behind** main; the aggregate file diff remains a single added `MIGRATION_STATUS.md`.
 - No pull requests or issues were returned by the repository-scoped searches.
 - The repository integration exposes commit/file/PR/issue and selected workflow-run operations, but does not expose a repository-wide workflow-list or directory-tree operation. Consequently, complete branch/tag/workflow/release inventory remains pending.
 - A commit-workflow-run lookup is PR-triggered-only and is not sufficient to conclude that no Actions runs exist.
