@@ -253,3 +253,23 @@ Finish the source/configuration and packaging preservation inventory, especially
 - ZIP/boot image validation: **not performed**.
 - Physical device boot and daily-driver testing: **not performed**.
 - No repository source, workflow, config, installer or package file was modified in this session; this update is documentation only.
+
+
+## Continuation re-check — 2026-11-16 16:20 UTC
+
+### Current ref verification
+- Rechecked the live branch list: `main` remains at `e87fe99406053025d97b361fe18cc8faf6e416c6`; `migration/linux-5.1-assessment` remains at `2a435274b9678d8003c31a274129c863d975ae0c`.
+- The migration branch still contains documentation-only changes relative to main. No Linux 5.1 source tree, compatibility shim, driver port, config migration, or build workflow has been introduced.
+- The current repository contains two Actions workflows, `.github/workflows/development.yml` and `.github/workflows/galaxy-a50.yml`; the current Actions runs endpoint reports zero runs. This is not build evidence.
+
+### Toolchain gate — exact control-flow confirmation
+- In `build.sh`, the default compiler selector is `neutron`. The `verify_toolchain()` neutron branch requires `$HOME/toolchains/neutron-clang`; if it is absent, the script calls `exit_script` immediately.
+- The current workflows install host packages but do not create or populate that required path. The script's repository-local toolchain fallback is reached only in other selector branches, not when the default `neutron` selector is active.
+- Therefore, on a clean GitHub-hosted runner with no pre-existing home-directory toolchain, the existing workflows are not self-sufficient for the default build path. Treat toolchain provisioning as a hard CI blocker, not a warning.
+- The Development workflow's optional `version` input remains unused by its build commands. The build script supports `--ksu`, but the workflow does not pass it; the inspected jobs build Magisk or non-root variants instead.
+
+### Session boundary
+- This was a read-only continuation audit followed by this status-document update only.
+- No kernel source, defconfig, DTS/DTBO, installer, build script, workflow, or release configuration was modified.
+- No compiler was run, no baseline build was attempted, no artifact was produced, and no device operation was performed.
+- Next safe action remains: provision and pin a known-compatible baseline toolchain, then run the exact A50 One UI 14 / SOVR build path on an isolated CI branch and capture the generated `.config`, `UTS_RELEASE`, Image, DTB, boot image and ZIP contents. Only after this baseline is reproducible should the build-script error-propagation defect be changed.
