@@ -275,3 +275,45 @@ Finish the source/configuration and packaging preservation inventory, especially
 - Next safe action remains: provision and pin a known-compatible baseline toolchain, then run the exact A50 One UI 14 / SOVR build path on an isolated CI branch and capture the generated `.config`, `UTS_RELEASE`, Image, DTB, boot image and ZIP contents. Only after this baseline is reproducible should the build-script error-propagation defect be changed.
 
 - The status refresh and subsequent ref-snapshot wording correction were separate documentation-only commits (`e51b73a79b638352feef2fbeb87c49519724c8a8` and `4f54666c10035f31d6761695332ce7a6b763617e`). Check the live branch head at the start of the next session rather than treating either intermediate SHA as the current HEAD. The aggregate diff against `main` remains limited to `MIGRATION_STATUS.md`.
+
+
+## Continuation update — 2026-11-16 21:28 PKT
+
+### Live state re-check
+- Confirmed repository is accessible and writable through the connected GitHub integration; default branch is `main`.
+- `main` remains at `e87fe99406053025d97b361fe18cc8faf6e416c6`.
+- Branch discovery currently returns exactly `main` and `migration/linux-5.1-assessment`.
+- Live compare reports the migration branch is **12 commits ahead and 0 behind** main. The complete compare file list still contains only `MIGRATION_STATUS.md` (one added file); no source, configuration, build, workflow, installer, or package modifications are present on the migration branch.
+- The current branch ref was used to fetch `MIGRATION_STATUS.md` successfully. The available branch-search operation returns branch names but not branch-tip SHAs; therefore this session does not claim an exact current migration-branch HEAD SHA. The next session should resolve the ref SHA through a Git refs/branch API or the repository's GitHub UI before making further changes.
+- `MIGRATION_PLAN.md` was requested as a recommended document but is not present on the current migration branch.
+- Main's `Makefile`, `build.sh`, `.github/workflows/development.yml`, `.github/workflows/galaxy-a50.yml`, README and selected A50 core defconfig were re-fetched from live main.
+
+### Build entry point — exact control-flow reconfirmed
+- `build.sh` defaults to `BUILD_PREF_COMPILER_VERSION='neutron'` and `BUILD_PREF_COMPILER='clang'`.
+- The Neutron branch requires `$HOME/toolchains/neutron-clang`; if absent, it calls `exit_script`. The clean-runner CI blocker is therefore confirmed directly in the live script.
+- The default path prepends the Neutron `bin` directory and the repository-local `toolchain/bin` to PATH, then sets `CROSS_COMPILE=aarch64-linux-gnu-` and `CROSS_COMPILE_ARM32=arm-linux-gnueabi-`.
+- The script's `download_toolchain()` clones `TenSeventy7/exynos9610_toolchains_fresh` from the moving GitLab branch `neutron`; however, the default Neutron selector's missing-`$HOME/toolchains/neutron-clang` branch exits before that repository-local fallback can provision the compiler. This clone is not a valid substitute for the required Neutron Clang directory.
+- The build script's CLI parser supports `--ksu` and translates it into `BUILD_KERNEL_KSU=true`; its KSU branch appends `CONFIG_KSU`, manual-hook and SuSFS configuration symbols. The Development workflow's `version` dispatch input still is not consumed by any build invocation, and the workflow invokes Magisk/non-root builds rather than `--ksu`.
+- The script invokes clean/mrproper, make configuration, kernel compilation, and Magisk update through pipelines ending in `sed`; the script does not establish script-level `set -e` or `set -o pipefail`. The parent Actions step's shell options do not automatically apply to this separately executed script. Failure propagation remains a confirmed defect, but do not patch until the baseline build environment and test approach are reproducible.
+- The A50 build script still selects `exynos9610-a50_core_defconfig`, then merges partial de-Knox, Android-version Mali, ROM variant, KSU/SuSFS or non-root, SELinux and Magisk/non-root fragments in sequence. The generated effective `.config` has not yet been captured.
+
+### Toolchain provenance — new external-source finding
+- The current Neutron Toolchains catalogue documentation describes Neutron as a rolling LLVM-source toolchain, with automated weekly builds, and explicitly cautions that complete stability cannot be guaranteed. This means an unqualified “latest” download is unsuitable as a reproducible baseline input.
+- The documented AntMan manager supports syncing a specific dated release tag, and records build tag/date, Clang version, LLVM commit, binutils version/commit, minimum host glibc and SHA-256 in build metadata. Its sync flow verifies the archive against the catalogue SHA-256 before extraction.
+- This provides a plausible mechanism for deterministic CI provisioning: select a fixed catalogue release, pin its tag, verify its published SHA-256, record compiler/LLVM/binutils/glibc metadata, and install it at the exact `$HOME/toolchains/neutron-clang` path expected by `build.sh`.
+- **No Neutron release tag has yet been selected or verified as the exact SOVR v4.2 compiler.** The README advertises Clang 23.1.5, but that claim alone does not identify a Neutron archive or prove compatibility with this downstream 4.14.357 source. Do not download “latest” or change the compiler selector until the matching release metadata and an actual clean build establish provenance and compatibility.
+- References for the toolchain mechanism: https://github.com/Neutron-Toolchains/clang-build-catalogue and https://github.com/Neutron-Toolchains/antman. These are toolchain documentation, not evidence that a particular release has passed the SOVR build.
+
+### Current decision and validation boundary
+- Preserve `main`; continue work only on `migration/linux-5.1-assessment`.
+- Do not modify `build.sh`, workflows, configs, DTS, installer or kernel source in this session. There is not yet a proven compiler archive/revision to pin, and no clean baseline build has been performed.
+- No compiler invocation, generated `.config`, Image/DTB/boot.img/ZIP artifact, static analysis, physical boot test or daily-driver test was performed.
+- Linux 5.1 migration remains **not started**. Existing functionality remains in the historical 4.14.357 source and has not been ported or validated against 5.1.
+
+### Next exact engineering task
+1. Resolve and record the exact current migration branch HEAD SHA.
+2. Inspect Neutron catalogue release metadata and locate the dated archive that corresponds to the repository's claimed Clang 23.1.5 (or otherwise establish the actual known-good compiler provenance from an authentic SOVR v4.2 build record/package).
+3. Verify its published SHA-256, compiler version, LLVM/binutils revisions and host glibc requirement; check whether the companion cross tools expected by this script are included.
+4. Add a **separate, non-release, manual CI baseline-validation workflow** on the migration branch that provisions that exact pinned toolchain into `$HOME/toolchains/neutron-clang`, records provenance, runs the exact Galaxy A50 One UI Android 14 enforcing/KSU build command selected for the known-good SOVR package, and uploads logs/config/image/DTB/ZIP even on failure where possible.
+5. Run it and capture the actual `.config`, `include/generated/utsrelease.h`, kernel image, DTB, boot image and ZIP contents. Confirm whether the built kernel reports 4.14.357 and reconcile the defconfig generated-header discrepancy.
+6. Only after this baseline can be reproduced should the script-level pipeline failure handling be corrected with focused tests; keep stable release publication and the `main` branch untouched.
