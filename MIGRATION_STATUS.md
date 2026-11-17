@@ -528,3 +528,56 @@ Finish the source/configuration and packaging preservation inventory, especially
 3. Preserve the One UI Android 14 no-legacy-assets installer path and the separate AOSP ZRAM writeback path.
 4. Before any build-script repair, capture the exact current v4.2 output and verify package contents. The existing pipeline failure propagation and DTS restore hazards remain candidates for isolated fixes with regression tests.
 5. No kernel source, configuration fragment, workflow, installer, or release file was changed in this audit. No compiler build, ZIP installation, physical-device flash or boot test was performed. Linux 5.1 migration remains not started.
+
+
+## Continuation update — 2026-11-17 (baseline version and build-script reliability audit)
+
+### Kernel version identity: source is 4.14.357; defconfig banner is stale
+
+- The top-level kernel `Makefile` on `main` declares `VERSION=4`, `PATCHLEVEL=14`, `SUBLEVEL=357`. This is the authoritative Kbuild source version: Linux 4.14.357.
+- `arch/arm64/configs/exynos9610-a50_core_defconfig` begins with the generated-file banner `Linux/arm64 4.14.194 Kernel Configuration`. This is stale provenance text embedded in a checked-in defconfig, not evidence that the current source tree is 4.14.194.
+- The build script prints the source version using Makefile variables, so it will identify 4.14.357 at build time.
+- Still unknown: whether the released v4.2 ZIP's embedded Image was actually built from this exact source commit and effective config. Only a successful controlled build plus binary comparison/metadata can close that gap.
+- Correct interpretation: source baseline 4.14.357; checked-in defconfig header claims it was originally generated on 4.14.194. Do not silently edit the header or assume all config values are refreshed for 4.14.357 without regenerating and reviewing the effective .config.
+
+### Toolchain provenance: build script does not pin a compiler version
+
+- `build.sh` hard-codes `BUILD_PREF_COMPILER='clang'` and `BUILD_PREF_COMPILER_VERSION='neutron'`.
+- Its primary expected compiler location is `$HOME/toolchains/neutron-clang`; the script's status text describes this as “LLVM 22+”. If missing, it clones the repository's external `toolchain` directory from `https://gitlab.com/TenSeventy7/exynos9610_toolchains_fresh.git`, branch `neutron`, shallow depth 1.
+- The script does not pin a Neutron Git commit, LLVM exact version, Clang binary hash, LLD version or target toolchain manifest. The external toolchain branch may move.
+- The source-level default therefore does **not** independently establish the earlier release-note claim of Clang/LLD 23.1.5. That claim must be checked against the actual v4.2 CI logs/artifact provenance or exact compiler binary.
+- `verify_toolchain()` checks for a directory and sets PATH/LD_LIBRARY_PATH; it does not validate `clang --version`, `ld.lld --version`, compiler hashes or linker identity before proceeding.
+- The build exports `CROSS_COMPILE=aarch64-linux-gnu-` and `CROSS_COMPILE_ARM32=arm-linux-gnueabi-`. The selected toolchain must contain/resolve compatible cross tools; this is another explicit baseline check.
+
+### Defconfig and fragment merge risks
+
+- The script copies the A50 core defconfig to a temporary defconfig, appends Android-version partial-deknox, Mali and ROM-variant fragments, then appends KSU/SuSFS or disables KSU, then SELinux mode and root/initramfs fragments.
+- It ultimately invokes Kconfig to produce the effective configuration. The temporary concatenated input is not equivalent to the final resolved `.config`.
+- The build script does not, in the inspected section, preserve a versioned copy of the final generated `.config` and a machine-readable manifest of fragment hashes/compiler identity beside every release ZIP.
+- The build script's `merge_config()` checks only that the named fragment file exists before appending its contents. It does not validate duplicate/conflicting assignments at append time.
+- A controlled baseline must archive: source commit, dirty-tree status, exact defconfig and fragment hashes, final resolved `.config`, compiler/LLD versions and hashes, build command/environment, build log, Image/DTB hashes and ZIP hash.
+
+### Concrete build-script failure-propagation issues
+
+- The script pipes multiple commands through `sed` for readable logs but does not set `set -o pipefail` in the inspected header. In Bash, without pipefail, a pipeline normally returns the status of its last command; a failed `make`, `git clone`, `zip`, or copy command can be masked by a successful `sed`.
+- The clean path uses `make clean | sed` and `make mrproper | sed`; a failure can be hidden. Similar risks occur in toolchain clone, Magisk update, ZIP creation and other piped commands.
+- The script uses `exit_script()` implemented as `kill -INT $$`, rather than a consistent error-return path with cleanup and a precise failure code.
+- `build_package()` creates a temporary staging directory using `mktemp`, copies assets, moves the only built `Image` and DTB into staging, zips the staging directory, moves the ZIP to output, and removes the staging directory. There is no visible EXIT trap in the inspected script to clean temporary state on failure.
+- Because the package stage uses `mv` for Image and DTB, a later packaging failure may leave the source build output without those files. A future fix should copy or stage from a preserved build-output directory, validate all expected inputs first, and only publish atomically after ZIP validation.
+- The ZIP command is `zip -9 -r ./${FILE_OUTPUT} ./* | sed ...`; without pipefail, a ZIP failure may be masked. The subsequent `mv` should be preceded by an explicit ZIP integrity test (e.g. `unzip -t`) and required-entry assertions.
+- The build script should not be globally rewritten in one step. Add strict error handling and trap-based cleanup in a dedicated CI-only/reproducibility branch first, with shellcheck and synthetic failure tests, then compare output hashes before replacing release behavior.
+
+### Device image metadata and packaging contract
+
+- `Documentation/device-db/a50.sh` declares A50 boot image metadata: board `SRPRL05B007KU`, base `0x10000000`, page size 2048, kernel offset `0x00008000`, ramdisk/second offset `0xf0000000`, tags offset `0x00000100`, header version 1, DTB hash type SHA-1.
+- These values feed the standalone mkbootimg path, but the normal SOVR ZIP path packages raw `Image` and `dtb_exynos.img` for AnyKernel repacking/flashing. Keep these two paths conceptually separate when validating the release.
+- The installer and DTB partition path still require verification against the exact A505F partition map and actual ZIP script before any installation changes.
+
+### Current state and next validation gate
+
+- The live source Makefile proves the checked-out source is 4.14.357. The defconfig's 4.14.194 banner is stale provenance text and must not be mistaken for the active source version.
+- The build script defaults to a movable Neutron toolchain branch and checks toolchain directory presence rather than exact compiler identity. The release's claimed Clang 23.1.5 remains unverified.
+- Pipeline failure masking and destructive `mv` staging are concrete reproducibility hazards. No source fix was made in this audit.
+- No CI workflow was dispatched, no new Actions run was created, and no build was attempted. The repository search still returned no open pull requests.
+- Next step: obtain the official v4.2 release artifact and associated CI provenance. If the ZIP cannot be fetched through the connector, use a reproducible release URL/download route with checksum verification before inspection. Then run a clean baseline build in an isolated branch/workspace and archive the final config, compiler manifest, build logs and artifact hashes.
+- No kernel source, defconfig, DTS, build script, installer, workflow, or release asset was modified. Linux 5.1 migration remains not started.
