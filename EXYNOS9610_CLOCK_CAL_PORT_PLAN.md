@@ -130,3 +130,31 @@ The default defconfig enables the same platform chain, with `CONFIG_CMUCAL_DEBUG
 The initial Linux 5.1 integration must account for the actual A50 build chain: Samsung composite CCF adapter + CAL_IF + CMUCAL + PMUCAL + Exynos9610 ACPM + ACPM DVFS + SoC data. It is not sufficient to port only `clk-exynos9610.c` and CMUCAL clock tables. The default config's CMUCAL debug option also needs a deliberate decision; it should not be enabled in a production build without auditing debugfs exposure, runtime overhead and dependencies.
 
 This resolves the earlier missing-defconfig-path uncertainty. It does **not** establish that these options currently compile against Linux 5.1.
+
+
+## Critical boot-order finding: CAL initialization is reached from the clock DT early-init callback
+
+The end of vendor `drivers/clk/samsung/clk-exynos9610.c` confirms this sequence:
+
+1. The provider init routine is registered with `CLK_OF_DECLARE(exynos9610_clk, "samsung,exynos9610-clock", exynos9610_clk_init)`.
+2. `exynos9610_clk_init()` maps the controller registers using `of_iomap(np, 0)`.
+3. It calls `cal_if_init(np)` before creating the Samsung clock provider with `samsung_clk_init(np, reg_base, CLK_NR_CLKS)`.
+4. The return value from `cal_if_init()` is checked; provider setup must not be assumed to proceed if CAL initialization fails.
+
+This means CAL is not a late optional service in this design: it is part of the early clock-provider bring-up path. The Linux 5.1 port must preserve the init ordering and ensure every dependency needed by `cal_if_init()` is available at that stage. A refactor to a platform driver or deferred probe would require explicit proof that no early clock consumer deadlocks or probes before the provider is ready.
+
+The CAL initializer itself calls, in order, ECT parsing, `vclk_initialize()`, optional `cal_data_init()`, PMUCAL RAE, system, local and CPU initialization, then optional CP/GNSS/sensor-hub initialization and finally `exynos_acpm_set_device(dev)`. The first failing PMUCAL stage aborts initialization. This ordering is now a P0 boot dependency and needs a dedicated boot-order test plan.
+
+## Build-system caveat: vendor composite clock symbol is not a drop-in upstream symbol
+
+Vendor `drivers/clk/samsung/Kconfig` defines `COMPOSITE_CLK_SAMSUNG` as a hidden bool depending on `ARCH_EXYNOS9 || ARCH_EXYNOS8 || ARCH_EXYNOS7`; the vendor Makefile then selects the custom `composite.o` and Exynos9610 clock driver in that branch. The A50 defconfigs explicitly set this symbol to `y`. Upstream Linux v5.1 does not carry this same vendor symbol / composite implementation at this location. Therefore the port needs a deliberate Kconfig and Makefile design for the v5.1 tree; copying only the defconfig setting will not activate a valid driver and may be silently dropped by Kconfig.
+
+## Exact source references used in this follow-up
+
+- Vendor CAL initializer: `drivers/soc/samsung/cal-if/cal-if.c`, blob `35c62490a906259667bc347231a7e35dc8b0b514`, `cal_if_init()` at source lines 450 onward.
+- Vendor Exynos9610 clock provider: `drivers/clk/samsung/clk-exynos9610.c`, blob `1ecdd4ea5b66601c2a68a1d8eefaf992505b2061`, `cal_if_init(np)` call and `CLK_OF_DECLARE` registration near the end of file.
+- Vendor clock Kconfig: `drivers/clk/samsung/Kconfig`, blob `dc14633a4a0618f7ba2c7cecf455e4c1a95cc123`.
+- Vendor CAL Kconfig: `drivers/soc/samsung/Kconfig`, blob `1d2a3a8baa33a94d125eb912835452c84c43ed59`.
+- Vendor CAL Makefile: `drivers/soc/samsung/cal-if/Makefile`, blob `00944ace1b772acd0193edf80792dd7b884e4c0a`.
+
+No source port or compile result is implied by this analysis.
