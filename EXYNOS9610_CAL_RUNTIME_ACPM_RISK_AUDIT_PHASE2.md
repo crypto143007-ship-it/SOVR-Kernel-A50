@@ -175,3 +175,27 @@ The six inspected Exynos9610 sequence headers (system, local, CPU, CP, GNSS, SHU
 | Hardware bit-29 normal/maximum startup timing | Not established |
 | Runtime failure reproduction on A50 | Not performed |
 | Timeout patch safety and recovery | Not yet established |
+
+
+## 6. Phase 2 follow-up: A50 PMUCAL data selection and P2V map spot-check
+
+### 6.1 A50 selects the system PMUCAL path
+
+Both `exynos9610-a50_core_defconfig` and `exynos9610-a50_default_defconfig` enable `CONFIG_PMUCAL=y` and `CONFIG_SOC_EXYNOS9610=y`. The CAL Makefile selects the generic PMUCAL system/RAE objects and Exynos9610 `cal_data.o` with those symbols. The SoC data translation unit includes the Exynos9610 PMUCAL system header.
+
+This independently confirms that the system LPM init array containing the oscillator RAW_WAIT is part of the configured A50 build inputs.
+
+### 6.2 P2V mapping inventory
+
+The Exynos9610 P2V table contains 58 `DEFINE_PHY()` entries. The active PMUCAL sequence data uses the expected mapped register regions for the system, local, CPU, CP, GNSS and SHUB sequence families.
+
+One CP sequence header line refers to physical base `0x12300000`, but it is explicitly commented out in the source. It is not an active sequence descriptor and must not be treated as a missing active mapping. It should remain commented unless the CP sequence is deliberately re-enabled and its mapping is validated.
+
+This is a source-level spot-check, not a complete generated parser proof of every sequence's base and condition address. The exhaustive address-coverage gate therefore remains open until a parser that handles multiline macro arguments and C preprocessor branches is run against the exact selected configuration.
+
+### 6.3 Updated engineering decision
+
+- Do not disable PMUCAL as a workaround: it is a dependency of the A50 clock/power integration, and disabling it would mask rather than solve the oscillator initialization issue.
+- Do not edit the vendor sequence table or change the RAW_WAIT operation yet.
+- Prioritize finding the oscillator ready-bit timing specification and validating the expected startup transition on known-good hardware.
+- Keep all source changes on the fork's migration branch and retain the known-good 4.14 recovery path.
