@@ -1,0 +1,163 @@
+# Exynos9610 Galaxy A50 Linux 5.1 integration branch
+
+## Immutable base
+
+- Upstream repository: https://github.com/torvalds/linux
+- Release: Linux v5.1
+- Base commit: `e93c9c99a629c61837d5a7fc2120cd2b6c70dbdd`
+- This branch was created directly from that commit.
+- This branch is separate from `migration/linux-5.1-assessment`; the existing vendor tree and its audit history are preserved.
+
+## Scope
+
+This branch is the clean upstream integration workspace for the Samsung Galaxy A50 SM-A505F / Exynos9610 port. It does not yet contain Samsung vendor code, A50 defconfigs, DTBs/DTBOs, firmware blobs, or a bootable device image.
+
+## Porting rules
+
+1. Keep the pinned upstream base identifiable; record every imported vendor source and its origin.
+2. Port only the minimum dependency closure required for Exynos9610 boot, then expand subsystem coverage.
+3. Keep Kconfig and Kbuild integration explicit; do not add vendor objects unconditionally.
+4. Preserve firmware ABI, DT resource order, clock IDs, PMUCAL sequencing and secure-world dependencies.
+5. Add SRAM/firmware bounds checks and robust error unwinding before enabling ACPM IPC.
+6. Do not import the Vothcito Linux 5.15 branch wholesale; use it only as a comparative reference.
+7. Do not copy permissive SELinux boot arguments or unverified board overlays.
+8. Do not claim build, boot, or runtime success until the corresponding reproducible test evidence exists.
+
+## Initial subsystem order
+
+1. Build and configuration infrastructure / cross-compiler baseline.
+2. Exynos9610 SoC identification, GIC, timer, pinctrl and interrupt dependencies.
+3. Samsung CAL / CMUCAL / PMUCAL and clock provider.
+4. ACPM IPC, firmware shared-memory ABI and DVFS.
+5. TZDEV / TEEGris and TZAR deployment path.
+6. Regulators, PMIC, thermal, UFS, IOMMU and power management.
+7. Display, touch, audio, modem and connectivity.
+8. A50 DTB/DTBO composition and Android boot integration.
+
+## First integration gate
+
+Before importing code, establish a clean upstream v5.1 ARM64 build from this exact branch and retain its build log/configuration. Then add the smallest Exynos9610 platform patch set and compile after each subsystem.
+
+No code is imported in this initial commit. No image is intended for flashing.
+
+
+## Baseline source audit — upstream v5.1 platform gaps
+
+Inspected the pinned v5.1 source files directly:
+
+- `arch/arm64/Kconfig.platforms`
+- `arch/arm64/boot/dts/Makefile`
+- `arch/arm64/boot/dts/exynos/Makefile`
+- `drivers/soc/samsung/Kconfig` and `Makefile`
+- `drivers/clk/samsung/Kconfig` and `Makefile`
+
+### What already exists
+
+- Generic ARM64 Samsung Exynos platform selection exists as `ARCH_EXYNOS`.
+- It selects the common Samsung clock framework, Exynos PMU, Exynos power domains (when enabled), and Exynos pinctrl.
+- The upstream Exynos ARM64 DTB Makefile includes Exynos5433 TM2/TM2E and Exynos7 Espresso targets.
+- Generic Samsung SoC infrastructure includes Exynos PMU and PM-domain support.
+- The generic Samsung ARM64 clock framework includes Exynos5433/Exynos7 support.
+
+### What is absent from this upstream v5.1 baseline
+
+- No Exynos9610 SoC DTB target in `arch/arm64/boot/dts/exynos/Makefile`.
+- No A50 SM-A505F board DTS/DTBO.
+- No Exynos9610 clock-controller implementation or clock-ID binding integration.
+- No vendor CAL/CMUCAL/PMUCAL Exynos9610 implementation in the generic Samsung SoC Kconfig/Makefile inspected.
+- No Exynos9610 ACPM IPC/DVFS driver integration in the generic Samsung SoC Kconfig/Makefile inspected.
+- No A50-specific defconfig in the clean upstream tree.
+
+### Implications
+
+Do not add a superficial `CONFIG_SOC_EXYNOS9610` symbol and claim the platform is ported. The platform needs a dependency graph and explicit Kconfig/Kbuild wiring for each imported component. Generic `ARCH_EXYNOS` selection alone is insufficient to initialize this SoC.
+
+### Next source-port task
+
+The first code patch should add only the SoC identification and minimal DT/Kconfig wiring needed to compile a non-booting Exynos9610 DTB, while leaving clock providers disabled until their driver and binding dependencies are imported. Then port the timer/GIC/interrupt/pinctrl dependencies, followed by CAL/clock and ACPM. Every patch must be built against the pinned v5.1 tree before proceeding.
+
+
+## Comparative source audit — Exynos9610 reference port (2026-11-17)
+
+Reference inspected read-only:
+- Repository: `Vothcito/android_kernel_samsung_exynos9610_a50`
+- Branch: `exynos9610-port`
+- Repository description identifies it as a work-in-progress Linux 5.15 A50 port.
+- This is a comparative source reference only. No write access was available or used, and no source has been copied into this integration branch in this audit.
+
+### Confirmed reference assets
+
+The reference branch contains a substantial Exynos9610 platform source set:
+- Generic SoC DTS: `arch/arm64/boot/dts/exynos/exynos9610.dts` (100,826 bytes; blob `cc5814a86d1dac1215e37da6774db0a1ba581c00`).
+- A50 universal board overlay: `exynos9610-universal9610.dts` (30,932 bytes; blob `eadc27822e505fc989274984097cbf4b7e32ffbd`).
+- Dedicated pinctrl, reserved-memory, debug, PM-domain, SysMMU, MFC, camera, display and TMU DTS fragments.
+- Exynos9610 clock driver: `drivers/clk/samsung/clk-exynos9610.c` (28,338 bytes).
+- Exynos9610 CAL data and generated register/clock tables under `drivers/soc/samsung/cal-if/exynos9610/`, including large CMUCAL and PMUCAL tables.
+- Exynos9610 clock binding header: `include/dt-bindings/clock/exynos9610.h`.
+- Additional Samsung DT bindings under `include/dt-bindings/soc/samsung/`.
+
+The reference Exynos9610 DTS includes more than a simple CPU/GIC description. Its include closure pulls in clock, pinctrl, reserved memory, debug snapshot, thermal, UFS, SysMMU, power-domain, devfreq, MFC and camera definitions. The node compatible inventory also includes Exynos9610 clock, MCT, Speedy, ACPM/IPC/DVFS, pinctrl, USI, HSI2C, SPI, UART, ABOX and other vendor-specific devices. These compatibles require corresponding drivers or must remain deliberately disabled until their implementations are ported.
+
+### Critical board-overlay warning
+
+The reference `exynos9610-universal9610.dts` contains a bootargs string with `androidboot.selinux=permissive`, vendor firmware paths, fixed reserved-memory assumptions and Samsung-specific boot setup. It is a vendor overlay, not a safe upstream A50 DTS to import verbatim.
+
+For this project:
+- Never copy permissive SELinux boot arguments into the upstream integration.
+- Do not assume the reference memory map, reserved-memory layout, initrd addresses, partition names or firmware paths match the target A50 ROM/boot chain.
+- Keep board-specific properties separate from the SoC-level DTS.
+- Derive the actual A50 board description from the known SM-A505F device tree and bootloader/firmware contract, then validate every reserved-memory and peripheral resource.
+
+### Version and ABI compatibility gate
+
+The reference is a Linux 5.15 work-in-progress tree, while the target is upstream Linux 5.1. The presence of a driver or DTS node in the reference does not establish that it is source/API compatible with 5.1. In particular, the Exynos9610 clock driver, Samsung CAL/PMUCAL, ACPM, pinctrl, SysMMU and power-domain integration need per-file API and Kconfig/Kbuild review.
+
+Do not import the complete 100-KiB DTS as a first patch. Its dependencies include binding headers and many drivers absent from upstream v5.1. The correct first code milestone is a deliberately minimal SoC DTS fragment with only validated architectural resources (GIC/timer/PSCI/CPU topology and required early console if proven), followed by one dependency group at a time. Keep unsupported devices disabled or omit their nodes until the driver exists.
+
+### Next implementation work
+
+1. Compare the reference Exynos9610 SoC DTS and the existing 4.14 vendor DTS structurally, not by filename alone.
+2. Extract the minimal early-boot hardware description and verify its interrupt IDs, address ranges, PSCI interface and CPU topology against the A50 hardware/vendor DT.
+3. Audit upstream v5.1 availability for each required binding and driver.
+4. Port the Exynos9610 clock binding and clock driver only together with its complete helper/header dependencies and a Kconfig symbol that does not accidentally enable unsupported clock controllers.
+5. Keep CAL/PMUCAL and ACPM out of the first DTS-only compile milestone; integrate them only after their ABI and initialization order are reviewed.
+6. Build the DTB with the v5.1 in-tree DTC and validate it with dtc warnings and schema checks where supported.
+
+### Current integration status
+
+No executable source, DTS, Kconfig or Makefile was changed in this audit. Only this integration-plan document was updated. There is still no target-tree compile, DTB build, boot image or hardware boot result.
+
+
+## Phase 10 — first-boot DTS contract audit (2026-11-17)
+
+The full reference SoC DTS was fetched and inspected at blob `cc5814a86d1dac1215e37da6774db0a1ba581c00`. The board overlay was inspected at `eadc27822e505fc989274984097cbf4b7e32ffbd`. This pass extracted the early-boot nodes and compared them with the upstream v5.1 Exynos7 DTS conventions.
+
+### Reference facts (not yet accepted as upstream values)
+
+- Eight CPU nodes: four Cortex-A53 cores with MPIDR values 0–3 and four Cortex-A73 cores with MPIDR values 0x100–0x103.
+- CPU enable method is PSCI.
+- Reference PSCI node uses SMC and vendor-provided function IDs: CPU_SUSPEND `0xC4000001`, CPU_OFF `0x84000002`, CPU_ON `0xC4000003`.
+- Reference GIC is described with compatible `arm,cortex-a15-gic`, `arm,cortex-a9-gic`, distributor/CPU-interface/virtual-interface/hypervisor-interface regions at 0x12301000, 0x12302000, 0x12304000 and 0x12306000, plus an interrupt.
+- Reference architectural timer uses four PPIs (13, 14, 11, 10) with an 8-CPU mask.
+- Reference timer block also contains a 26-MHz clock-frequency and vendor-specific `use-clocksource-only` / `use-physical-timer` properties.
+- The SoC DTS contains several memory banks and hard-coded chosen/initrd data; these are not suitable to copy into a generic upstream SoC include.
+
+### Porting decisions
+
+1. Preserve the A53/A73 topology as a candidate, but confirm MPIDR affinity and cluster layout against the SM-A505F hardware and existing boot DT before committing.
+2. Do not copy the vendor PSCI function IDs without confirming the A50 boot firmware's PSCI version and conduit contract. Prefer standard PSCI binding semantics if firmware supports them; otherwise document the exact firmware ABI.
+3. The legacy GIC compatible string and four-region layout must be checked against Linux v5.1 GICv2 driver match data and the hardware TRM. Do not silently replace it with a GIC-400 compatible just because the GIC is commonly described that way in other Samsung devices.
+4. Use standard architectural timer binding only. The vendor timer extensions and fixed clock-frequency are not to be copied unless a Linux 5.1 driver explicitly consumes them and hardware validation confirms them.
+5. Keep RAM banks, initrd addresses, reserved-memory, ECT parameters and bootargs out of the SoC-level first patch. They are bootloader/board/firmware contract data and require device-specific validation.
+6. The reference uses `#size-cells = <1>` with 64-bit address cells. Any minimal DTS must preserve correct cell encoding and validate all `reg` tuple widths.
+
+### First patch gate — still blocked
+
+A safe minimal Exynos9610 DTS patch cannot be finalized from the reference DTS alone. The following evidence is still required:
+- Actual SM-A505F boot DTB/DTBO or a complete extracted live device tree.
+- Confirmed memory map and reserved-memory ranges for the target ROM/boot chain.
+- Confirmed GIC version/interface layout and interrupt routing.
+- Confirmed PSCI version, conduit and function-ID behavior.
+- Exact upstream v5.1 DTC build and warning output.
+
+No DTS/Kconfig/Kbuild source was changed in this phase. This is intentional: a syntactically plausible but unverified early-boot DT can hang before the kernel console starts. The next safe action is to obtain the device's real DTB/DTBO (or dump `/sys/firmware/fdt` and `/proc/device-tree`) and reconcile it with this reference before writing the first boot-critical DTS nodes.
