@@ -42,23 +42,26 @@ u32 acpm_reg_id = REGULATOR_INFO_ID;
 
 void acpm_ipc_set_waiting_mode(bool mode)
 {
-	acpm_ipc->w_mode = mode;
+	if (acpm_ipc)
+		acpm_ipc->w_mode = mode;
 }
 
 void acpm_fw_log_level(unsigned int on)
 {
-	acpm_debug->debug_log_level = on;
+	if (acpm_debug)
+		acpm_debug->debug_log_level = on;
 }
 
 u32 acpm_get_mifdn_count(void)
 {
-	return acpm_initdata->mifdn_count;
+	return acpm_initdata ? acpm_initdata->mifdn_count : 0;
 }
 
 void acpm_ramdump(void)
 {
 #ifdef CONFIG_DEBUG_SNAPSHOT_ACPM
-	if (acpm_debug->dump_size)
+	if (acpm_debug && acpm_debug->dump_size && acpm_debug->dump_dram_base &&
+			acpm_debug->dump_base)
 		memcpy(acpm_debug->dump_dram_base, acpm_debug->dump_base, acpm_debug->dump_size);
 #endif
 }
@@ -245,10 +248,14 @@ int acpm_ipc_set_ch_mode(struct device_node *np, bool polling)
 
 	if (!np)
 		return -ENODEV;
+	if (!acpm_ipc || !acpm_ipc->channel)
+		return -EPROBE_DEFER;
 
 	prop = of_get_property(np, "acpm-ipc-channel", &len);
 	if (!prop)
 		return -ENOENT;
+	if (len < sizeof(*prop))
+		return -EINVAL;
 	req_ch_id = be32_to_cpup(prop);
 
 	for(i = 0; i < acpm_ipc->num_channels; i++) {
@@ -310,7 +317,11 @@ unsigned int acpm_ipc_request_channel(struct device_node *np, ipc_callback handl
 
 unsigned int acpm_ipc_release_channel(struct device_node *np, unsigned int channel_id)
 {
-	struct acpm_ipc_ch *channel = &acpm_ipc->channel[channel_id];
+	struct acpm_ipc_ch *channel;
+
+	if (!acpm_ipc || !acpm_ipc->channel || channel_id >= acpm_ipc->num_channels)
+		return -EINVAL;
+	channel = &acpm_ipc->channel[channel_id];
 	struct list_head *cb_list = &channel->list;
 	struct callback_info *cb;
 
@@ -576,8 +587,9 @@ int acpm_ipc_send_data(unsigned int channel_id, struct ipc_config *cfg)
 	u64 timeout, now;
 	u32 retry_cnt = 0;
 
-	if (channel_id >= acpm_ipc->num_channels && !cfg)
-		return -EIO;
+	if (!acpm_ipc || !acpm_ipc->channel || !acpm_debug ||
+			!cfg || !cfg->cmd || channel_id >= acpm_ipc->num_channels)
+		return -EINVAL;
 
 	channel = &acpm_ipc->channel[channel_id];
 
@@ -699,8 +711,8 @@ static void log_buffer_init(struct device *dev, struct device_node *node)
 		num_timestamps = be32_to_cpup(prop);
 
 	acpm_debug = devm_kzalloc(dev, sizeof(struct acpm_debug_info), GFP_KERNEL);
-	if (IS_ERR(acpm_debug))
-		return ;
+	if (!acpm_debug)
+		return;
 
 	acpm_debug->time_index = acpm_ipc->sram_base + acpm_ipc->initdata->ktime_index;
 	acpm_debug->num_timestamps = num_timestamps;
@@ -755,8 +767,13 @@ static int channel_init(void)
 
 	acpm_ipc->num_channels = acpm_ipc->initdata->ipc_ap_max;
 
+	if (!acpm_ipc->num_channels || acpm_ipc->num_channels > 32)
+		return -EINVAL;
+
 	acpm_ipc->channel = devm_kzalloc(acpm_ipc->dev,
 			sizeof(struct acpm_ipc_ch) * acpm_ipc->num_channels, GFP_KERNEL);
+	if (!acpm_ipc->channel)
+		return -ENOMEM;
 
 	for (i = 0; i < acpm_ipc->num_channels; i++) {
 		ipc_ch = (struct ipc_channel *)(acpm_ipc->sram_base + acpm_ipc->initdata->ipc_channels);
@@ -780,8 +797,15 @@ static int channel_init(void)
 		acpm_ipc->channel[i].tx_ch.d_buff_size = ipc_ch[i].ch.rx_indr_buf_size;
 		acpm_ipc->channel[i].tx_ch.direction = acpm_ipc->sram_base + ipc_ch[i].ch.rx_indr_buf;
 
+		if (!acpm_ipc->channel[i].tx_ch.size ||
+				!acpm_ipc->channel[i].tx_ch.len ||
+				acpm_ipc->channel[i].id >= 32)
+			return -EINVAL;
+
 		acpm_ipc->channel[i].cmd = devm_kzalloc(acpm_ipc->dev,
 				acpm_ipc->channel[i].tx_ch.size, GFP_KERNEL);
+		if (!acpm_ipc->channel[i].cmd)
+			return -ENOMEM;
 
 		init_completion(&acpm_ipc->channel[i].wait);
 		spin_lock_init(&acpm_ipc->channel[i].rx_lock);
@@ -813,10 +837,12 @@ static int acpm_ipc_probe(struct platform_device *pdev)
 	acpm_ipc = devm_kzalloc(&pdev->dev,
 			sizeof(struct acpm_ipc_info), GFP_KERNEL);
 
-	if (IS_ERR(acpm_ipc))
-		return PTR_ERR(acpm_ipc);
+	if (!acpm_ipc)
+		return -ENOMEM;
 
 	acpm_ipc->irq = irq_of_parse_and_map(node, 0);
+	if (!acpm_ipc->irq)
+		return -EINVAL;
 
 	ret = devm_request_threaded_irq(&pdev->dev, acpm_ipc->irq, acpm_ipc_irq_handler,
 			acpm_ipc_irq_handler_thread,
@@ -829,17 +855,21 @@ static int acpm_ipc_probe(struct platform_device *pdev)
 	}
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res)
+		return -ENODEV;
 	acpm_ipc->intr = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(acpm_ipc->intr))
 		return PTR_ERR(acpm_ipc->intr);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!res)
+		return -ENODEV;
 	acpm_ipc->sram_base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(acpm_ipc->sram_base))
 		return PTR_ERR(acpm_ipc->sram_base);
 
 	prop = of_get_property(node, "initdata-base", &len);
-	if (prop) {
+	if (prop && len >= sizeof(*prop)) {
 		acpm_ipc->initdata_base = be32_to_cpup(prop);
 	} else {
 		dev_err(&pdev->dev, "Parsing initdata_base failed.\n");
@@ -853,13 +883,22 @@ static int acpm_ipc_probe(struct platform_device *pdev)
 
 	log_buffer_init(&pdev->dev, node);
 
-	channel_init();
+	ret = channel_init();
+	if (ret)
+		return ret;
 
 	update_log_wq = create_freezable_workqueue("acpm_update_log");
+	if (!update_log_wq)
+		return -ENOMEM;
 	INIT_WORK(&acpm_debug->update_log_work, acpm_update_log);
 
 	if (acpm_debug->period) {
 		debug_logging_wq = create_freezable_workqueue("acpm_debug_logging");
+		if (!debug_logging_wq) {
+			destroy_workqueue(update_log_wq);
+			update_log_wq = NULL;
+			return -ENOMEM;
+		}
 		INIT_DELAYED_WORK(&acpm_debug->periodic_work, acpm_debug_logging);
 
 		queue_delayed_work(debug_logging_wq, &acpm_debug->periodic_work,
