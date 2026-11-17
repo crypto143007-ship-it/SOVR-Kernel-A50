@@ -284,3 +284,71 @@ The exact blob SHA for `pmucal_system_exynos9610.h` and `pmucal_p2vmap_exynos961
 | Linux 5.1 compile and A50 runtime validation | Not performed |
 
 No kernel source implementation was changed. This phase adds reproducible source-audit findings only.
+
+
+## 9. Phase 5: ACPM IPC boot dependency and Linux initcall ordering audit
+
+### 9.1 ACPM is enabled by both A50 defconfigs
+
+Both `exynos9610-a50_core_defconfig` and `exynos9610-a50_default_defconfig` enable:
+- `CONFIG_EXYNOS_ACPM=y`
+- `CONFIG_EXYNOS9610_ACPM=y`
+- `CONFIG_ACPM_DVFS=y`
+- `CONFIG_PMUCAL=y`
+
+The Samsung SoC Makefile descends into `acpm/` under `CONFIG_EXYNOS_ACPM`. The ACPM Makefile builds `acpm.o` and `acpm_ipc.o`; CAL-IF builds `acpm_dvfs.o` under `CONFIG_ACPM_DVFS`. ACPM Kconfig makes the Exynos9610 ACPM option depend on `SOC_EXYNOS9610`.
+
+This means ACPM IPC and DVFS are not optional side features in the checked A50 configurations. The Linux 5.1 port must preserve the selected build graph or explicitly justify a platform redesign.
+
+### 9.2 Two distinct platform drivers and initcall levels
+
+The IPC transport registers its platform driver using `arch_initcall(exynos_acpm_ipc_init)`. Its probe obtains:
+- IRQ index 0 from the ACPM IPC device tree node;
+- memory resource 0 for the interrupt controller registers;
+- memory resource 1 for the shared SRAM window;
+- `initdata-base` to locate the ACPM firmware framework structure in SRAM.
+
+It then derives channel count, channel IDs, queue sizes, queue offsets, and ring-buffer addresses from the firmware-populated shared-memory structures and configures the interrupt mask.
+
+The DVFS driver separately registers using `fs_initcall(exynos_acpm_dvfs_init)`. Its init function requests the DVFS IPC channel using the OF node saved by `exynos_acpm_set_device()`, then registers the DVFS platform driver. The DVFS platform probe requests a second channel for MIF notifications and adds a PM QoS request.
+
+The CAL initializer stores the device node with `exynos_acpm_set_device(dev)` only after ECT/VCLK setup and successful PMUCAL system/local/CPU initialization (plus enabled CP/GNSS/SHUB paths). The A50 clock-provider entry point and its relationship to the ACPM DT nodes must therefore be preserved and verified in the Linux 5.1 tree.
+
+Initcall registration order alone does not prove the ACPM IPC device has probed before DVFS channel allocation: platform-device creation, driver registration, probe deferral, and the actual DT node topology determine that. The exact A50 DT nodes and their resources remain to be located in the selected branch.
+
+### 9.3 Firmware ABI and resource validation gates
+
+Treat the following as a coupled firmware/driver ABI:
+- ACPM DT compatible strings (`samsung,exynos-acpm-ipc` and `samsung,exynos-acpm-dvfs`);
+- `acpm-ipc-channel` and `initdata-base` properties;
+- IRQ and two MMIO resources;
+- firmware framework structure layout and offsets;
+- channel descriptor layout, ring-buffer indices, queue sizes and indirect-buffer metadata;
+- IPC command words, interrupt acknowledgements, completion/polling policy and response timeout behavior.
+
+The current source obtains shared SRAM pointers by adding firmware-provided offsets to the mapped SRAM base. A port must validate all offsets and lengths against the mapped resource before dereferencing them; do not assume a successful ioremap proves the firmware layout is valid.
+
+### 9.4 Error-handling hazards found in the transport source
+
+The inspected IPC probe assigns `devm_kzalloc()` to `acpm_ipc` but tests `IS_ERR(acpm_ipc)`; `devm_kzalloc()` returns NULL on allocation failure, not an ERR_PTR. The subsequent dereference can therefore crash on allocation failure. Several later allocations in channel/log initialization are also not consistently checked before use.
+
+This is a source-level robustness issue worth fixing during the port, but the correct fix should be made with the Linux 5.1 version of the code and reviewed for cleanup/unwind correctness. Do not transplant a partial check without handling partially initialized IRQ, mappings, workqueues, and channel state.
+
+The DVFS init function logs a failed primary channel request but proceeds to register the platform driver anyway. This can defer the failure into later DVFS calls; the port should establish whether channel acquisition must be fatal or whether probe deferral/retry is supported by the actual boot sequence. Do not silently change this contract without checking clock-provider callers.
+
+### 9.5 Updated ACPM readiness status
+
+| Gate | Status |
+|---|---|
+| ACPM enabled in both A50 defconfigs | Confirmed |
+| IPC and DVFS Kbuild objects selected | Confirmed |
+| IPC driver initcall and DT resource requirements | Source-confirmed |
+| DVFS initcall and two-channel usage | Source-confirmed |
+| CAL stores provider OF node after CAL init | Source-confirmed |
+| Actual A50 ACPM DT nodes and resource values | Not yet found in this branch |
+| Probe ordering / deferred-probe behavior | Not established |
+| Shared SRAM bounds and firmware ABI validation | Not complete |
+| Linux 5.1 API/build compatibility | Not tested |
+| Device runtime and firmware validation | Not performed |
+
+No kernel implementation or device-tree source was changed in this phase. Continue with locating the exact A50 DT sources and tracing the CLK_OF_DECLARE provider node to the ACPM DVFS node before any init-order modification.
