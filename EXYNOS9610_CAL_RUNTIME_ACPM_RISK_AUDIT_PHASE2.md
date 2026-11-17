@@ -480,3 +480,42 @@ Do not add isolated NULL checks without a complete initialization/unwind design.
 | Runtime validation | Not performed |
 
 No executable kernel code or DTS was changed in this phase. The next implementation should be a separate, reviewable ACPM hardening commit on this fork branch, not an unbounded rewrite of the transport.
+
+
+## 12. Phase 8: First narrowly scoped ACPM IPC hardening implementation
+
+A first implementation patch has now been made in `drivers/soc/samsung/acpm/acpm_ipc.c`. It intentionally addresses deterministic allocation/input failure cases without attempting the larger firmware ABI or interrupt-order rewrite.
+
+### 12.1 Changes made
+
+- Corrected the probe's `devm_kzalloc()` failure test from `IS_ERR()` to a NULL check and return `-ENOMEM`.
+- Corrected the debug-info allocation check in log initialization and changed that initializer to return an error which the probe propagates.
+- Added checked allocation for timestamp storage and optional dump memory mapping/storage.
+- Added guards for public IPC entry points that could otherwise dereference uninitialized global IPC/debug state.
+- Validated that the `acpm-ipc-channel` property contains at least one 32-bit cell before reading it.
+- Corrected the send-data argument validation: the old condition used `channel_id >= num_channels && !cfg`, which allowed an out-of-range channel when cfg was non-NULL and allowed a NULL cfg when the channel was in range. The new guard rejects missing IPC/channel/debug state, NULL cfg/cmd, and out-of-range channel IDs.
+- Added allocation checks for the channel array and per-channel command buffers.
+- Added basic descriptor sanity checks for a nonzero channel count (bounded to the 32-bit interrupt mask width), nonzero queue element size/length, and channel IDs below 32.
+- Added checks for a missing IRQ mapping and missing MMIO resources before use.
+- Added workqueue allocation checks and propagate channel/log initialization errors.
+
+### 12.2 Scope deliberately not claimed
+
+This is not yet complete ACPM hardening. In particular:
+- Firmware-provided SRAM offsets, descriptor tables, queue pointers, queue arithmetic, and indirect buffers are not yet range-validated against the mapped SRAM resource.
+- The IRQ is still requested before all MMIO and firmware-derived channel state is initialized. The interrupt masking/acknowledgement protocol must be understood before safely reordering it.
+- The global singleton state, plain `ioremap()` dump mapping, workqueue teardown, IRQ mapping disposal, remove path, and partial-probe unwind still need a lifecycle design.
+- Channel IDs are checked for width but duplicate IDs and all producer/consumer index values are not yet validated.
+- The exact A50 kernel configuration has not been compiled, and no device runtime test has been performed.
+
+### 12.3 Review requirement before hardware use
+
+Do not flash this intermediate patch as a replacement for the known-good kernel. It is a source-level hardening step only. It must pass a target-tree compile and static review, then be tested on a recoverable device with a known-good boot image available.
+
+### 12.4 Commit
+
+Implementation commit: `5003200b573a88dea8a316f742caf6d0c07d5a0f` (`fix(acpm): harden IPC allocation and input validation`).
+
+Follow-up commit: `a32ee15fffaf9480a429445971c8816809b93640` (`fix(acpm): propagate debug buffer initialization failures`).
+
+The code change is confined to the user's fork and migration branch. No upstream SOVR repository or main branch was targeted.
