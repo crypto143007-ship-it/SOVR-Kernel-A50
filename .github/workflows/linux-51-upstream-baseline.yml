@@ -1,0 +1,66 @@
+name: Linux 5.1 Upstream ARM64 Baseline
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-51-upstream-baseline
+  cancel-in-progress: false
+
+jobs:
+  arm64-defconfig-build:
+    name: Build pinned upstream v5.1 ARM64 defconfig (baseline only)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout SOVR migration branch (audit metadata)
+        uses: actions/checkout@v4
+        with:
+          ref: migration/linux-5.1-assessment
+          path: sovr
+
+      - name: Install cross-build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex libssl-dev libelf-dev             make python3 gcc-10-aarch64-linux-gnu binutils-aarch64-linux-gnu
+
+      - name: Checkout immutable upstream Linux v5.1 commit
+        uses: actions/checkout@v4
+        with:
+          repository: torvalds/linux
+          ref: e93c9c99a629c61837d5a7fc2120cd2b6c70dbdd
+          path: linux
+
+      - name: Record source identity
+        working-directory: linux
+        run: |
+          test "$(git rev-parse HEAD)" = "e93c9c99a629c61837d5a7fc2120cd2b6c70dbdd"
+          git show -s --format='commit=%H%nsubject=%s%nauthor_date=%aI' HEAD | tee ../upstream-source.txt
+          git status --short
+
+      - name: Configure upstream ARM64 defconfig
+        working-directory: linux
+        run: |
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
+          cp .config ../upstream-arm64-defconfig.config
+
+      - name: Compile upstream ARM64 Image and DTBs
+        working-directory: linux
+        run: |
+          make -j2 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image dtbs
+
+      - name: Upload upstream baseline evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-v5.1-upstream-arm64-baseline
+          path: |
+            upstream-source.txt
+            upstream-arm64-defconfig.config
+            linux/arch/arm64/boot/Image
+            linux/arch/arm64/boot/dts/**/*.dtb
+          if-no-files-found: warn
+          retention-days: 14
