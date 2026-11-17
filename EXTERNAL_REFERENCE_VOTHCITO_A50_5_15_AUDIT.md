@@ -107,3 +107,15 @@ This reference is valuable because it exposes a Linux 5.15 A50/Exynos9610 resear
 It does **not** reduce the core Linux 5.1 migration risk to a solved problem. It targets 5.15, is explicitly early-stage, carries a stale 4.14.194 config header, and has no demonstrated compile/boot/hardware validation in the inspected evidence. It also does not establish preservation of SOVR's TZDEV, ZRAM extensions, KernelSU/SuSFS, EROFS/ROM packaging or daily-driver feature set.
 
 **Action:** retain as a read-only comparative reference. The next concrete technical task is to diff its Exynos9610 clock-driver and CAL include/Kbuild graph against SOVR and the existing CAL port plan, then compare the universal9610 overlay against the exact SOVR A50 DT sources. Do not merge or import source until the dependency graph and target-version API compatibility are documented.
+
+
+## Follow-up exact-source diff — Exynos9610 clock driver and CAL Kbuild
+
+A full-file comparison was performed between the reference branch and SOVR `main`:
+
+- Both `drivers/clk/samsung/clk-exynos9610.c` files are 389 lines.
+- After normalizing the four relative include paths, every line is identical. The only four changed lines are the include paths for `cmucal-vclk.h`, `cmucal-node.h`, `cmucal-qch.h` and `clkout_exynos9610.h`.
+- Both versions retain the same counts of the key initialization/descriptor constructs: 169 `HWACG_VCLK` occurrences, 23 `struct init_vclk` occurrences, one `CLK_OF_DECLARE`, one `cal_if_init` call, and one `samsung_clk_init` call.
+- `drivers/soc/samsung/cal-if/Makefile` is byte-for-byte identical in both repositories (same blob SHA above).
+
+**Interpretation:** the Vothcito reference does not demonstrate a substantive Linux 5.15 API port of the Exynos9610 clock driver or CAL Kbuild. It relocates the referenced Exynos9610 CMUCAL header paths while retaining the original vendor clock initialization and CAL call flow. This is a source-layout adaptation, not proof of successful 5.15 compilation. The next audit must verify that every referenced header/object exists at the new path, is selected by Kconfig, and compiles against the 5.15 clock framework.
