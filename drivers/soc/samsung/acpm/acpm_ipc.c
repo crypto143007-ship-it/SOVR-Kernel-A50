@@ -698,7 +698,7 @@ retry:
 	return 0;
 }
 
-static void log_buffer_init(struct device *dev, struct device_node *node)
+static int log_buffer_init(struct device *dev, struct device_node *node)
 {
 	const __be32 *prop;
 	unsigned int num_timestamps = 0;
@@ -712,12 +712,16 @@ static void log_buffer_init(struct device *dev, struct device_node *node)
 
 	acpm_debug = devm_kzalloc(dev, sizeof(struct acpm_debug_info), GFP_KERNEL);
 	if (!acpm_debug)
-		return;
+		return -ENOMEM;
 
 	acpm_debug->time_index = acpm_ipc->sram_base + acpm_ipc->initdata->ktime_index;
 	acpm_debug->num_timestamps = num_timestamps;
-	acpm_debug->timestamps = devm_kzalloc(dev,
-			sizeof(unsigned long long) * num_timestamps, GFP_KERNEL);
+	if (!num_timestamps)
+		return -EINVAL;
+	acpm_debug->timestamps = devm_kcalloc(dev, num_timestamps,
+			sizeof(unsigned long long), GFP_KERNEL);
+	if (!acpm_debug->timestamps)
+		return -ENOMEM;
 	acpm_debug->log_buff_rear = acpm_ipc->sram_base + acpm_ipc->initdata->log_buf_rear;
 	acpm_debug->log_buff_front = acpm_ipc->sram_base + acpm_ipc->initdata->log_buf_front;
 	acpm_debug->log_buff_base = acpm_ipc->sram_base + acpm_ipc->initdata->log_data;
@@ -738,6 +742,8 @@ static void log_buffer_init(struct device *dev, struct device_node *node)
 
 	if (dump_base && dump_size) {
 		acpm_debug->dump_base = ioremap(dump_base, dump_size);
+		if (!acpm_debug->dump_base)
+			return -ENOMEM;
 		acpm_debug->dump_size = dump_size;
 	}
 
@@ -747,6 +753,8 @@ static void log_buffer_init(struct device *dev, struct device_node *node)
 
 #ifdef CONFIG_DEBUG_SNAPSHOT_ACPM
 	acpm_debug->dump_dram_base = kzalloc(acpm_debug->dump_size, GFP_KERNEL);
+	if (acpm_debug->dump_size && !acpm_debug->dump_dram_base)
+		return -ENOMEM;
 	dbg_snapshot_printk("[ACPM] acpm framework SRAM dump to dram base: 0x%x\n",
 			virt_to_phys(acpm_debug->dump_dram_base));
 #endif
@@ -757,6 +765,8 @@ static void log_buffer_init(struct device *dev, struct device_node *node)
 
 	if (acpm_initdata->regulator_id)
 		acpm_reg_id = acpm_initdata->regulator_id;
+
+	return 0;
 }
 
 static int channel_init(void)
@@ -881,7 +891,9 @@ static int acpm_ipc_probe(struct platform_device *pdev)
 
 	acpm_ipc->dev = &pdev->dev;
 
-	log_buffer_init(&pdev->dev, node);
+	ret = log_buffer_init(&pdev->dev, node);
+	if (ret)
+		return ret;
 
 	ret = channel_init();
 	if (ret)
