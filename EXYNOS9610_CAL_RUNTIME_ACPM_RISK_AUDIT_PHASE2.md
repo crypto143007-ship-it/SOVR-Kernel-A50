@@ -352,3 +352,57 @@ The DVFS init function logs a failed primary channel request but proceeds to reg
 | Device runtime and firmware validation | Not performed |
 
 No kernel implementation or device-tree source was changed in this phase. Continue with locating the exact A50 DT sources and tracing the CLK_OF_DECLARE provider node to the ACPM DVFS node before any init-order modification.
+
+
+## 10. Phase 6: A50 DT overlay and Exynos9610 ACPM node chain located
+
+The earlier Phase 5 statement that the actual A50 ACPM DT nodes had not yet been found is now superseded. The nodes are in the shared Exynos9610 base DT, while A50 board files are overlays.
+
+### 10.1 Device-tree composition
+
+- `arch/arm64/boot/dts/exynos/exynos9610.dts` defines the SoC-level clock controller and ACPM nodes.
+- A50 board overlay `arch/arm64/boot/dts/samsung/exynos9610-a50_cis_ser_00.dts` includes `exynos9610-a50_common.dtsi`.
+- The A50 common overlay does not redefine the ACPM IPC/DVFS nodes in the inspected section; they are inherited from the base Exynos9610 DT when the overlay is applied.
+- `arch/arm64/boot/dts/exynos/Makefile` selects `exynos9610.dtb` and the Exynos9610/9611 universal overlays under `CONFIG_SOC_EXYNOS9610`. Samsung A50 overlay variants are separately listed in `arch/arm64/boot/dts/samsung/dtbo_exynos.cfg`; this configuration file lists the SWA variants, not the CIS SER 00 overlay inspected above. The exact production DTBO selected by the user's boot image must be confirmed from that image/build configuration.
+
+### 10.2 Exact inherited base-DT resources and channels
+
+| Node | Compatible / purpose | Properties |
+|---|---|---|
+| `/clock-controller@0x12100000` | `samsung,exynos9610-clock` | MMIO `0x12100000 / 0x8000`, `#clock-cells = <1>`, IPC channel 0 |
+| `/acpm` | `samsung,exynos-acpm` | IPC channel 4; timer APM `0x11820000 / 0x1000`; `fvmap_offset = 0x6000`; `peritimer-cnt = 0xffff` |
+| `/acpm_ipc` | `samsung,exynos-acpm-ipc` | IRQ SPI 38; mailbox `0x11900000 / 0x1000`; APM SRAM `0x02039000 / 0x15000`; `initdata-base = 0x6f00`; 32 timestamps |
+| `/acpm_dvfs` | `samsung,exynos-acpm-dvfs` | IPC channel 5 |
+
+The A50 common overlay additionally assigns channel 2 to the S2MPU09 PMIC child of the Speedy controller. That is a separate consumer and should not be confused with the clock-provider (0), ACPM framework (4), or DVFS (5) channels.
+
+### 10.3 Consequences for the Linux 5.1 port
+
+1. Preserve the base-DT plus board-DTBO composition; do not copy ACPM nodes into the A50 overlay and accidentally create duplicate nodes.
+2. Keep the channel assignments 0, 2, 4 and 5 consistent with their respective consumers.
+3. Preserve the two IPC resources in their exact order because the current driver obtains resource 0 for the mailbox interrupt controller and resource 1 for shared SRAM.
+4. Validate that the mapped SRAM resource covers the firmware framework at offset `0x6f00`, all channel descriptors/ring buffers derived from it, and any other offsets used by the current firmware ABI. The DT's SRAM window is 0x15000 bytes; no assumption that every firmware pointer is in range should replace explicit bounds validation.
+5. The IRQ is represented in the SoC base DTS as `<0 38 0>`; retain the existing interrupt-parent inherited from the root unless the selected base tree says otherwise.
+6. Verify the actual device-tree blob/overlay set used by the target A50 firmware before changing node status, addresses, IRQs or overlay selection.
+
+### 10.4 Init-order conclusion refined
+
+The base DTS defines the clock controller with IPC channel 0, ACPM framework channel 4, IPC transport resources, and DVFS channel 5. The DT structure is now identified, but this alone does not establish successful runtime probe order. The transport driver must have initialized its global IPC state and parsed the firmware channel table before the clock/DVFS consumers request channels. This remains a runtime/initcall and probe-order gate.
+
+### 10.5 Updated readiness status
+
+| Gate | Status |
+|---|---|
+| Base Exynos9610 ACPM framework node located | Confirmed |
+| Base Exynos9610 ACPM IPC node located | Confirmed |
+| Base Exynos9610 ACPM DVFS node located | Confirmed |
+| Clock-provider IPC channel identified | 0 |
+| PMIC IPC channel in A50 common overlay identified | 2 |
+| ACPM framework channel identified | 4 |
+| DVFS IPC channel identified | 5 |
+| IPC mailbox and shared-SRAM resources identified | Confirmed in source DT |
+| Exact production A50 DTBO selection | Still to verify |
+| Firmware offsets/ring-buffer bounds validated | Not yet |
+| Linux 5.1 probe ordering and runtime | Not tested |
+
+This phase updates documentation only; no DTS or kernel implementation files were modified.
