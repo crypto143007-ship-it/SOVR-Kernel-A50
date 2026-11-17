@@ -679,3 +679,38 @@ Linux 5.1 is a 2019 non-LTS release series and is not listed among kernel.org's 
 ### Current conclusion
 
 The first major technical blocker is now evidenced directly: vanilla Linux v5.1 has no Exynos9610/A50 platform support stack corresponding to the SOVR 4.14 tree. The migration scope is substantially larger than rebasing generic kernel code. No kernel code, DTS, Kconfig, driver or workflow was changed in this comparison. No compilation, device flash or boot test was performed.
+
+
+## Continuation update — Exynos9610 device-tree hardware contract inventory (2026-11-17)
+
+A targeted parse of the current SOVR Exynos9610 SoC DTS and Universal9610/A50 board overlay identified the following hardware-facing compatible strings and included binding files. This is an inventory of declared DT contracts, not proof that each driver is enabled or functional on the target phone.
+
+### SoC-level contracts in `exynos9610.dts`
+
+- Boot/platform core: `samsung,exynos9-chipid`, `arm,psci`, `samsung,exynos-pm`, Cortex-A53/A73 CPU nodes, GIC and ARMv8 timer.
+- Clock/power: `samsung,exynos9610-clock`, `samsung,exynos-acpm`, ACPM IPC/DVFS, Exynos DVFS manager, devfreq root/devfreq, PMU and TMU.
+- Pin/I/O: Exynos9610 pinctrl, wakeup EINT, USI v2, HSI2C, SPI and UART.
+- Storage/security: Exynos UFS, FMP, TEE/TEEGris, secure log, reboot and TrustZone-related nodes.
+- Display/graphics: Exynos9 DPP/display subsystem/DSIM/DECON, MIPI PHY, Mali, G2D, scaler and JPEG.
+- USB and DMA/isolation: DWC3/Exynos USB DRD PHY, PL330 DMA, Exynos IOMMU/SysMMU.
+- Samsung subsystem interfaces: ABOX audio, SCSC Wi-Fi/Bluetooth, WLBT BAAW/remap windows, VIPX and related multimedia nodes.
+
+### A50/Universal9610 board overlay contracts
+
+- Board identity: `samsung,exynos9610` / Universal9610 A50 board revision.
+- Boot/vendor contract: Android firmware, vbmeta and fstab nodes; boot arguments include Android hardware identity, firmware path and initrd placement.
+- Power/PMIC: S2MPU09 MFD, SM5713 MFD, fixed regulators and board battery data.
+- Touch/input: GPIO keys and Melfas MMS touchscreen.
+- Audio: Exynos9610 audio, dummy CPU, RT5665 codec and TFA98xx amplifier.
+- UFS RPMB, USB notifier and modem S337AP SIPC platform data.
+- Display panel and triple-camera board-specific includes.
+
+### Porting implications
+
+1. The DTS is not just a list of generic peripherals. It encodes Samsung-specific clock IDs, interrupt wiring, memory reservations, sysmmu mappings, PM domains, secure-world interfaces, WLBT address windows, storage setup and board-specific PMIC/audio/touch/camera data. Preserve the DTS and its binding headers as a unit while porting their drivers.
+2. Porting only `clk-exynos9610.c` is insufficient: it depends on the CAL/CMUCAL provider and the matching DT clock IDs. Similarly, the SoC DTS depends on Exynos9610 clock, devfreq, thermal, UFS, IOMMU and Samsung subsystem bindings.
+3. Treat display, touch, UFS, audio, modem and SCSC connectivity as independent acceptance gates. A kernel that reaches Android userspace with one or more of these unavailable is not a successful daily-driver port.
+4. The TEEGris/TZDEV nodes and TZAR deployment path are a hard boot/runtime dependency to investigate early, not a late optional driver.
+5. Before implementation, produce a path-level matrix mapping every active DT compatible to its 4.14 driver source, Kconfig symbol, Makefile entry, v5.1 API delta and test method. Do not mark a node "ported" merely because its DTS compiles.
+
+No DT source or driver was modified. The next code-oriented deliverable should be this compatible-to-driver matrix, followed by a minimal compileable Exynos9610 platform patch series against a pinned v5.1 base.
