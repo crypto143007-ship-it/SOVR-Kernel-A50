@@ -1,0 +1,65 @@
+name: ARM64 upstream v5.1 baseline
+
+on:
+  push:
+    branches:
+      - linux-5.1-exynos9610-integration
+    paths:
+      - 'Makefile'
+      - 'arch/**'
+      - 'block/**'
+      - 'certs/**'
+      - 'crypto/**'
+      - 'drivers/**'
+      - 'fs/**'
+      - 'include/**'
+      - 'init/**'
+      - 'kernel/**'
+      - 'lib/**'
+      - 'mm/**'
+      - 'net/**'
+      - 'scripts/**'
+      - 'security/**'
+      - 'sound/**'
+      - 'tools/**'
+      - 'virt/**'
+      - '.github/workflows/arm64-upstream-baseline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  arm64-baseline:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out integration branch
+        uses: actions/checkout@v4
+
+      - name: Install ARM64 build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            bc bison build-essential flex gcc-aarch64-linux-gnu \
+            libelf-dev libssl-dev device-tree-compiler python3
+
+      - name: Configure clean upstream ARM64 defconfig
+        run: |
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -s kernelversion
+          grep -E '^(CONFIG_ARCH_EXYNOS|CONFIG_EXYNOS_THERMAL|CONFIG_SERIAL_SAMSUNG)=' .config || true
+
+      - name: Build upstream ARM64 Image and DTBs
+        run: |
+          make -j2 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image dtbs
+
+      - name: Publish baseline build outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-v5.1-arm64-upstream-baseline
+          if-no-files-found: error
+          path: |
+            arch/arm64/boot/Image
+            arch/arm64/boot/dts/**/*.dtb
+            .config
