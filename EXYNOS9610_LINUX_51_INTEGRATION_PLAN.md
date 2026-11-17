@@ -178,3 +178,10 @@ The two user-supplied artifacts were inspected as binary inputs:
 Do not create or import the A50 memory/reserved-memory nodes from the SOVR base payload. Do not conclude that SOVR 4.2 targets a 6-GiB A50 from the base payload alone. Obtain the exact matching SOVR 4.2 `dtbo.img` (and its build/selection metadata if available), identify the selected overlay corresponding to the boot chain, and compare the resulting composed tree with the live FDT. Reconcile the live RAM banks with `/proc/iomem`, `MemTotal`, and reserved/secure carveouts before writing board memory nodes.
 
 The CPU/PSCI/GIC/timer observations are evidence for a candidate minimal DTS only; each binding and driver still needs checking against upstream Linux v5.1. No boot-critical DTS source was added in this phase. No kernel/DTB build or hardware boot is claimed.
+
+
+## Phase 12 — reproducible upstream ARM64 baseline CI (2026-11-17)
+
+Added `.github/workflows/arm64-upstream-baseline.yml` on this integration branch. It runs on branch changes to kernel build/source paths and supports manual dispatch. The job installs an ARM64 cross-toolchain, generates the clean upstream ARM64 `defconfig`, builds `Image` and the upstream ARM64 DTB set, and publishes the build outputs plus `.config` as an Actions artifact.
+
+This is deliberately a **generic upstream Linux v5.1 baseline check**, not an Exynos9610/A50 kernel build: the current upstream tree still has no Exynos9610 DTS target or A50 defconfig. A green run will prove only that the pinned upstream baseline builds in CI; it will not prove A50 hardware support or bootability. The first workflow result remains pending verification.
