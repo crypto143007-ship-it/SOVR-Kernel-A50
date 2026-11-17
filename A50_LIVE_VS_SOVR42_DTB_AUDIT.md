@@ -54,7 +54,7 @@ SOVR 4.2 DTB memory banks:
 - 0x880000000 size 0x80000000
 - 0x900000000 size 0x80000000
 
-The live DTB describes 4 GiB total RAM across fragmented low memory plus one high bank. The SOVR DTB describes 6 GiB total RAM across one low bank and two high banks. This is a material mismatch for the user's 4-GiB SM-A505F. Do not use the SOVR memory nodes as the basis for the user's device tree. Confirm the physical memory map against the running kernel's memory report and bootloader-provided DT before any port.
+The live DTB declares 3.893 GiB across fragmented low memory plus one 2-GiB high bank. The SOVR DTB declares 6 GiB across one 2-GiB low bank and two 2-GiB high banks. The live bank total is below the handset's nominal 4-GiB capacity; the difference is not explained by the memory nodes alone and must be reconciled with reserved/secure carveouts and the running kernel's `/proc/iomem` and `MemTotal`. The SOVR declaration is a material mismatch for the user's 4-GiB SM-A505F. Do not use the SOVR memory nodes as the basis for the user's device tree. Confirm the physical memory map against the running kernel's memory report and bootloader-provided DT before any port.
 
 ## Other significant differences
 
