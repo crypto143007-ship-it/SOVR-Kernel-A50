@@ -97,3 +97,36 @@ The Exynos9610 CAL data directory is substantial, not a small table: it contains
 ### Additional gating decision
 
 Before enabling the driver in a Linux 5.1 build, identify the exact A50 defconfig values for `CAL_IF`, `CMUCAL`, `PMUCAL`, `ACPM_DVFS`, `CONFIG_PWRCAL`, and the Exynos9610 SoC symbol. Then trace every caller of `cal_if_init()` and verify that the selected init path is actually invoked before clock consumers probe. A compile-only result cannot validate this ordering.
+
+
+## Confirmed A50 defconfig configuration (previously unresolved)
+
+The correct A50 configuration files are present in the vendor tree:
+
+- `arch/arm64/configs/exynos9610-a50_core_defconfig`, blob `c3b98544257220d284cbebc290d45c913025c050`.
+- `arch/arm64/configs/exynos9610-a50_default_defconfig`, blob `3dc783a1474de4d5dcff60410950ef4271b36c51`.
+
+Both were fetched and searched directly. The core defconfig enables:
+- `CONFIG_SOC_EXYNOS9610=y`
+- `CONFIG_COMPOSITE_CLK_SAMSUNG=y`
+- `CONFIG_CAL_IF=y`
+- `CONFIG_CMUCAL=y`
+- `CONFIG_CMUCAL_QCH_IGNORE_SUPPORT=y`
+- `CONFIG_EXYNOS_ACPM=y`
+- `CONFIG_EXYNOS9610_ACPM=y`
+- `CONFIG_EXYNOS_ACPM_MFD=y`
+- `CONFIG_ACPM_DVFS=y`
+- `CONFIG_PMUCAL=y`
+- `CONFIG_CP_PMUCAL=y`
+- `CONFIG_GNSS_PMUCAL=y`
+- `CONFIG_SHUB_PMUCAL=y`
+- `CONFIG_EXYNOS_THERMAL=y`
+- `CONFIG_EXYNOS_ACPM_THERMAL=y`
+
+The default defconfig enables the same platform chain, with `CONFIG_CMUCAL_DEBUG=y` (the core defconfig disables it). Neither file contains an enabled `CONFIG_PWRCAL=y` setting. Thus the checked-in A50 defconfigs select the CAL/CMUCAL/PMUCAL path, not the optional PWRCAL branch discussed above.
+
+### Consequence for the port
+
+The initial Linux 5.1 integration must account for the actual A50 build chain: Samsung composite CCF adapter + CAL_IF + CMUCAL + PMUCAL + Exynos9610 ACPM + ACPM DVFS + SoC data. It is not sufficient to port only `clk-exynos9610.c` and CMUCAL clock tables. The default config's CMUCAL debug option also needs a deliberate decision; it should not be enabled in a production build without auditing debugfs exposure, runtime overhead and dependencies.
+
+This resolves the earlier missing-defconfig-path uncertainty. It does **not** establish that these options currently compile against Linux 5.1.
