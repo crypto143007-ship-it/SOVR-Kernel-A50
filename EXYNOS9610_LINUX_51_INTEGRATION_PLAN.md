@@ -126,3 +126,32 @@ Do not import the complete 100-KiB DTS as a first patch. Its dependencies includ
 ### Current integration status
 
 No executable source, DTS, Kconfig or Makefile was changed in this audit. Only this integration-plan document was updated. There is still no target-tree compile, DTB build, boot image or hardware boot result.
+
+
+## Phase 10 — first-boot DTS contract audit (2026-11-17)
+
+Inspected the reference SoC DTS (blob `cc5814a86d1dac1215e37da6774db0a1ba581c00`) and A50 overlay (blob `eadc27822e505fc989274984097cbf4b7e32ffbd`).
+
+### Reference early-boot facts — not yet accepted as upstream values
+
+- Eight CPU nodes: four Cortex-A53 cores (MPIDR 0–3) and four Cortex-A73 cores (MPIDR 0x100–0x103).
+- CPU enable method is PSCI.
+- Vendor PSCI node uses SMC and function IDs CPU_SUSPEND `0xC4000001`, CPU_OFF `0x84000002`, CPU_ON `0xC4000003`.
+- Reference GIC uses `arm,cortex-a15-gic`, `arm,cortex-a9-gic` with distributor/CPU/virtual/hypervisor regions at 0x12301000, 0x12302000, 0x12304000 and 0x12306000.
+- Architectural timer PPIs are 13, 14, 11 and 10 with an 8-CPU mask.
+- Vendor timer node also contains 26-MHz clock-frequency and non-standard properties.
+
+### Porting decisions
+
+1. Confirm MPIDR affinity and cluster topology against SM-A505F hardware and the actual boot DT.
+2. Do not copy vendor PSCI function IDs without confirming firmware PSCI version, conduit and ABI. Prefer standard PSCI binding semantics when supported.
+3. Check the GIC compatible and four-region layout against Linux v5.1 GIC driver match data and hardware documentation; do not infer GIC-400 solely from the SoC family.
+4. Use standard architectural timer properties only; vendor extensions require a Linux 5.1 consumer and hardware evidence.
+5. Keep RAM banks, initrd addresses, reserved memory, ECT and bootargs out of the SoC-level first patch until the exact A50 boot-chain contract is verified.
+6. Preserve correct address/size cell widths in all reg tuples.
+
+### First patch gate — blocked pending device evidence
+
+Required: actual SM-A505F boot DTB/DTBO or live DT dump; verified memory/reserved-memory map; GIC layout and interrupt routing; PSCI version/conduit/function behavior; and a successful v5.1 DTC build.
+
+No DTS/Kconfig/Kbuild source was changed in this phase. This avoids committing a plausible but unverified early-boot description that could hang before console initialization. Next obtain `/sys/firmware/fdt` or the original DTB/DTBO and reconcile it with the reference before writing boot-critical nodes.
