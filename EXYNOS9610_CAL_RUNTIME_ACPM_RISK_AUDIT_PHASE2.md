@@ -113,3 +113,65 @@ Risk classification: API-contract hazard. It may be an intentional firmware resp
 - No release, flashable ZIP, or boot image was produced.
 - Preserve the working Linux 4.14.357 recovery baseline.
 - All future modifications remain restricted to the user's fork; the SOVR-Technologies repository is reference-only.
+
+
+## 5. Phase 2 follow-up: RAW_WAIT is present in the unconditional LPM initialization sequence
+
+This follow-up supersedes the earlier statement that A50 reachability had not been established.
+
+### 5.1 Exact source occurrence
+
+The Exynos9610 source header `drivers/soc/samsung/cal-if/exynos9610/pmucal_system_exynos9610.h` defines the array `pmucal_lpm_init[]`. It contains exactly one `PMUCAL_RAW_WAIT` descriptor in the inspected system sequence data:
+
+```c
+PMUCAL_SEQ_DESC(PMUCAL_RAW_WAIT, "OSC_CON0_OSC",
+                0x11860000, 0x0c00,
+                (0x1 << 29), (0x1 << 29),
+                0, 0, 0xffffffff, 0),
+```
+
+The descriptor polls PMU register physical base 0x11860000, offset 0x0c00, until bit 29 is set.
+
+### 5.2 Initialization call chain establishes reachability
+
+The source path is:
+
+1. Both A50 core and default defconfigs set `CONFIG_SOC_EXYNOS9610=y` and `CONFIG_PMUCAL=y`.
+2. `drivers/soc/samsung/cal-if/Makefile` selects `pmucal_system.o` and `pmucal_rae.o` under `CONFIG_PMUCAL`, and selects `exynos9610/cal_data.o` under `CONFIG_SOC_EXYNOS9610`.
+3. `exynos9610/cal_data.c` includes `pmucal_system_exynos9610.h`, defining the A50 SoC LPM init data.
+4. `cal_if_init()` calls `pmucal_system_init()` and propagates any negative return.
+5. `pmucal_system_init()` converts the full `pmucal_lpm_init[]` array through `pmucal_rae_phy2virt()`, then calls `pmucal_rae_handle_seq(pmucal_lpm_init, pmucal_lpm_init_size)`.
+6. `pmucal_rae_handle_seq()` dispatches `PMUCAL_RAW_WAIT` directly to `pmucal_rae_raw_wait()`.
+7. `pmucal_rae_raw_wait()` loops until bit 29 reads as set. It has no timeout, delay, `cpu_relax()`, or error return.
+
+Conclusion: this is not merely an unused optional sequence descriptor. It is part of the PMUCAL system initialization array executed by the A50 CAL initialization path when that path is enabled. A failure of the oscillator-ready condition can therefore hang the CPU in early CAL initialization rather than return an error to the caller.
+
+### 5.3 Correct risk assessment
+
+Risk: **critical boot-time hang path**, conditional on the hardware register bit not reaching the expected state. The normal hardware transition is not proven faulty; this audit identifies the consequence if the condition does not complete.
+
+Do not change the wait semantics until the hardware requirement and expected oscillator startup latency are understood. A safe future patch must:
+- determine the documented maximum oscillator startup time and any required sequencing constraints;
+- choose a timeout with sufficient hardware margin based on specifications or validated traces;
+- emit register value and sequence index on timeout;
+- propagate `-ETIMEDOUT` through `pmucal_system_init()` and `cal_if_init()`;
+- confirm that aborting this initialization sequence is safer than proceeding with incomplete clock/oscillator setup;
+- validate cold boot, warm reboot, suspend/resume, and repeated boot cycles on physical A50 hardware.
+
+A timeout is not automatically safe: if the oscillator is required for subsequent clock setup, returning an error may still prevent boot, but it converts an indefinite silent hang into a diagnosable failure. The hardware recovery strategy must be determined before implementation.
+
+### 5.4 Source-level occurrence count boundary
+
+The six inspected Exynos9610 sequence headers (system, local, CPU, CP, GNSS, SHUB) contain one active `PMUCAL_RAW_WAIT` occurrence, in the system LPM init array. Other `PMUCAL_WAIT` operations are bounded by `pmucal_rae_wait()`; commented-out descriptors are not active sequence entries. This count applies to these six checked files, not to unrelated SoC data or future revisions.
+
+### 5.5 Updated status
+
+| Gate | Updated status |
+|---|---|
+| RAW_WAIT active occurrence in Exynos9610 data | One active occurrence found |
+| A50 configuration selects PMUCAL and Exynos9610 CAL data | Confirmed in both checked defconfigs and Makefile |
+| RAW_WAIT included in system LPM init array | Confirmed |
+| LPM init array executed by pmucal_system_init | Confirmed |
+| Hardware bit-29 normal/maximum startup timing | Not established |
+| Runtime failure reproduction on A50 | Not performed |
+| Timeout patch safety and recovery | Not yet established |
