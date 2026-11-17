@@ -405,3 +405,63 @@ Finish the source/configuration and packaging preservation inventory, especially
 4. Reproduce the Linux 4.14.357 build using an authenticated, pinned toolchain. Capture the final `.config`, `UTS_RELEASE`, Image, DTB/DTBO, boot image, ZIP contents and build logs.
 5. Only after the baseline is reproducible, implement a separate manual, non-release CI validation workflow on this branch; then address pipeline failure propagation with regression tests.
 6. Keep `main` untouched and do not begin Linux 5.1 source replacement until the baseline and preservation matrix are complete.
+
+
+## Continuation update — 2026-11-17 (DTB, image and installer chain re-audit)
+
+### Scope and safety
+- Re-inspected live `main` source files: `build.sh`, `arch/arm64/Makefile`, `arch/arm64/boot/Makefile`, `arch/arm64/boot/dts/Makefile`, `arch/arm64/boot/dts/exynos/Makefile`, `arch/arm64/boot/dts/exynos/dtb_exynos.cfg`, `arch/arm64/boot/dts/samsung/dtbo_exynos.cfg`, and `tools/make/package/mint.sh`.
+- No kernel source, defconfig, DTS, build script, installer, workflow, or release artifact was modified.
+- No binary ZIP was downloaded or inspected; release asset metadata and its published checksum remain unverified at the byte level.
+
+### Corrected DTB/DTBO build-path finding
+- The earlier statement that the DTB path was unresolved because `build_dtb()` / `build_dtbo()` are not called was incomplete. These two shell helpers are unused legacy functions, but the kernel's default Kbuild targets independently schedule Exynos DTB/DTBO image creation.
+- `arch/arm64/Makefile` sets `KBUILD_DTBO_EXYNOS_IMG=dtbo_exynos.img` and `KBUILD_DTB_EXYNOS_IMG=dtb_exynos.img`, and adds both as dependencies of `all`.
+- `arch/arm64/boot/Makefile` discovers DTBOs under `arch/arm64/boot/dts/samsung` and DTBs under `arch/arm64/boot/dts/exynos`. It invokes `mkdtimg` for `dtbo_exynos.img` and `mkdtbimg` for `dtb_exynos.img`.
+- The DTB image configuration `arch/arm64/boot/dts/exynos/dtb_exynos.cfg` selects `exynos9610.dtb` and assigns custom0=0x00000000/custom1=0x000000ff.
+- The DTBO image configuration `arch/arm64/boot/dts/samsung/dtbo_exynos.cfg` lists A50 SWA open variants 00, 01, 02, 03, 04 and 06 with their custom metadata.
+- `arch/arm64/boot/dts/Makefile` includes `exynos/exynos9610.dtb` and the six A50 DTBO source targets.
+- This establishes a source-level Kbuild generation path. It does not prove the generated binary is valid, matches the released ZIP, or is appropriate for every A505F hardware revision.
+
+### Critical packaging distinction: DTBO generated, not staged
+- `build_package()` moves `arch/arm64/boot/Image` to package root as `Image`, and `arch/arm64/boot/dtb_exynos.img` to package root as `dtb.img`.
+- It does **not** stage `dtbo_exynos.img` into the ZIP.
+- The AnyKernel installer sets `dtbblock=/dev/block/platform/13520000.ufs/by-name/dtb` and calls `flash_generic dtb`; it does not call a DTBO flashing function in the inspected installer.
+- Therefore, the current package path installs the combined Exynos DTB image to the dedicated `dtb` partition; the separately generated DTBO image appears unused by this package path. Do not add DTBO flashing or remove DTBO generation until the A50 bootloader/partition layout and release ZIP are inspected.
+
+### Critical boot-image distinction: boot.img is not the packaged kernel payload
+- `build_image()` creates `tools/make/boot.img` using `mkbootimg` and the device database's page/header/offset values.
+- The normal non-recovery flow then calls `build_package()`, which stages the raw kernel `Image` and `dtb_exynos.img`; it does not stage the just-created `tools/make/boot.img`.
+- The installer uses AnyKernel3 `split_boot` and `flash_boot`, so the ZIP's raw `Image` is injected into the existing device boot image by the installer. The standalone `tools/make/boot.img` is not the payload flashed by this path.
+- The `build_image()` output must not be treated as the release boot image without inspecting the package. Its metadata remains relevant as a secondary build artifact, but the actual install route is AnyKernel boot repacking plus dedicated DTB flashing.
+
+### ROM-specific DTS selection and working-tree hazard
+- Before kernel compilation, `build.sh` copies a variant DTS over `arch/arm64/boot/dts/exynos/exynos9610.dts`:
+  - AOSP Android 14+: `aosp14/exynos9610.dts`
+  - Legacy AOSP: `aosp/exynos9610.dts`
+  - One UI Android 14+: `oneui14/exynos9610.dts`
+  - Other One UI targets leave the checked-in default DTS in place.
+- After packaging, it attempts to restore the original with `git checkout arch/arm64/boot/dts/exynos/exynos9610.dts`.
+- This restore command can discard pre-existing local modifications to that DTS in a developer's working tree. It is a build reproducibility and data-loss risk. A future safe fix should use a temporary output/source overlay or save-and-restore the exact pre-build file state, with a regression test; do not change it before baseline reproduction.
+- The source copy is performed in the source tree, not a separately isolated output tree. Parallel builds for different ROM variants in the same checkout would race on the shared DTS path. This is another reason to use isolated worktrees/build directories for variant builds.
+
+### Installer behavior relevant to the user's Android 14 One UI baseline
+- `mint.sh` detects Fresh/One UI properties and Android SDK version. For SDK 34/35/36 it explicitly selects pure SOVR kernel defaults for One UI 6+/Fresh 6 and does not copy the legacy One UI 3/One UI 4 performance assets.
+- The installer calls `split_boot`, `flash_boot`, then `flash_generic dtb`.
+- The DTB block path is hard-coded as `/dev/block/platform/13520000.ufs/by-name/dtb`; compatibility with the user's exact A505F partition map must be confirmed before any new installer is produced.
+- AOSP uses a different branch that installs ZRAM writeback overlay/init/fstab assets. That is separate from the user's current One UI 6.1.1-based ROM and must not be mixed into the One UI package.
+
+### Updated conclusions and next gates
+1. Source-level DTB generation is now traced. The earlier unresolved-call concern is superseded: Kbuild, not the unused shell helpers, creates the Exynos DTB/DTBO image outputs.
+2. The release package path stages raw `Image` and `dtb_exynos.img` only. DTBO is generated but not staged/flashed by the inspected installer.
+3. The generated standalone `tools/make/boot.img` is not the normal ZIP's boot payload; AnyKernel repacks the installed boot image from raw `Image`.
+4. The source-tree DTS overwrite followed by `git checkout` is a concrete build safety issue to address later, after capturing a reproducible baseline.
+5. The next evidence gate remains obtaining the official v4.2 A14 One UI KSU ZIP from the separate release repository, verifying its published SHA-256, then inspecting ZIP entries, installer scripts, kernel Image metadata, DTB payload and any embedded config/build metadata.
+6. After binary forensics, establish a clean build environment and reproduce the exact Android 14 One UI enforcing + KSU build. Do not begin Linux 5.1 driver migration or alter the packaging contract before this baseline is understood.
+
+### Validation boundary
+- Source-level build/packaging flow: inspected.
+- Release ZIP bytes and checksum: not downloaded or independently verified.
+- Generated Image, DTB, DTBO and boot.img: not built or inspected.
+- No compiler run, static analysis, physical device test, flash or boot validation performed.
+- Linux 5.1 migration remains not started.
