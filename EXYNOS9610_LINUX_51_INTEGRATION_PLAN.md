@@ -39,3 +39,39 @@ This branch is the clean upstream integration workspace for the Samsung Galaxy A
 Before importing code, establish a clean upstream v5.1 ARM64 build from this exact branch and retain its build log/configuration. Then add the smallest Exynos9610 platform patch set and compile after each subsystem.
 
 No code is imported in this initial commit. No image is intended for flashing.
+
+
+## Baseline source audit — upstream v5.1 platform gaps
+
+Inspected the pinned v5.1 source files directly:
+
+- `arch/arm64/Kconfig.platforms`
+- `arch/arm64/boot/dts/Makefile`
+- `arch/arm64/boot/dts/exynos/Makefile`
+- `drivers/soc/samsung/Kconfig` and `Makefile`
+- `drivers/clk/samsung/Kconfig` and `Makefile`
+
+### What already exists
+
+- Generic ARM64 Samsung Exynos platform selection exists as `ARCH_EXYNOS`.
+- It selects the common Samsung clock framework, Exynos PMU, Exynos power domains (when enabled), and Exynos pinctrl.
+- The upstream Exynos ARM64 DTB Makefile includes Exynos5433 TM2/TM2E and Exynos7 Espresso targets.
+- Generic Samsung SoC infrastructure includes Exynos PMU and PM-domain support.
+- The generic Samsung ARM64 clock framework includes Exynos5433/Exynos7 support.
+
+### What is absent from this upstream v5.1 baseline
+
+- No Exynos9610 SoC DTB target in `arch/arm64/boot/dts/exynos/Makefile`.
+- No A50 SM-A505F board DTS/DTBO.
+- No Exynos9610 clock-controller implementation or clock-ID binding integration.
+- No vendor CAL/CMUCAL/PMUCAL Exynos9610 implementation in the generic Samsung SoC Kconfig/Makefile inspected.
+- No Exynos9610 ACPM IPC/DVFS driver integration in the generic Samsung SoC Kconfig/Makefile inspected.
+- No A50-specific defconfig in the clean upstream tree.
+
+### Implications
+
+Do not add a superficial `CONFIG_SOC_EXYNOS9610` symbol and claim the platform is ported. The platform needs a dependency graph and explicit Kconfig/Kbuild wiring for each imported component. Generic `ARCH_EXYNOS` selection alone is insufficient to initialize this SoC.
+
+### Next source-port task
+
+The first code patch should add only the SoC identification and minimal DT/Kconfig wiring needed to compile a non-booting Exynos9610 DTB, while leaving clock providers disabled until their driver and binding dependencies are imported. Then port the timer/GIC/interrupt/pinctrl dependencies, followed by CAL/clock and ACPM. Every patch must be built against the pinned v5.1 tree before proceeding.
