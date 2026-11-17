@@ -317,3 +317,42 @@ Finish the source/configuration and packaging preservation inventory, especially
 4. Add a **separate, non-release, manual CI baseline-validation workflow** on the migration branch that provisions that exact pinned toolchain into `$HOME/toolchains/neutron-clang`, records provenance, runs the exact Galaxy A50 One UI Android 14 enforcing/KSU build command selected for the known-good SOVR package, and uploads logs/config/image/DTB/ZIP even on failure where possible.
 5. Run it and capture the actual `.config`, `include/generated/utsrelease.h`, kernel image, DTB, boot image and ZIP contents. Confirm whether the built kernel reports 4.14.357 and reconcile the defconfig generated-header discrepancy.
 6. Only after this baseline can be reproduced should the script-level pipeline failure handling be corrected with focused tests; keep stable release publication and the `main` branch untouched.
+
+
+## Continuation update — 2026-11-17 (live branch and compiler provenance investigation)
+
+### Exact live ref snapshot
+- main remains at e87fe99406053025d97b361fe18cc8faf6e416c6.
+- migration/linux-5.1-assessment is currently at 8506b2feb53ca6f6285f6908c56952bc57cec5c5.
+- GitHub compare confirms the migration branch is 13 commits ahead and 0 behind main. Its only aggregate file change is MIGRATION_STATUS.md; no kernel source, config, workflow, installer, or package implementation has changed.
+- Main recursive tree was fetched successfully with truncated=false and 72,306 entries. The migration branch has 72,307 entries due to the status document.
+- The repository-scoped Actions runs endpoint returned total_count: 0; no build evidence exists. PR search returned no PRs. Open issue search returned no issues. The current repository's releases endpoint is empty; tags remain unverified through the available endpoint.
+
+### Authentic SOVR v4.2 release evidence — separate release repository
+- The README's release link resolves to SOVR-Technologies/SOVR-Kernel-A50, which has a public v4.2 release published 2026-11-15 with eight uploaded ZIP assets.
+- The release notes claim the source is OpenELA Linux 4.14.357 + ELTS, compiled with Clang 23.1.5, ThinLTO and LLD 23.1.5. These are upstream release-note claims; they are not yet independently verified from the binary payload.
+- The A14 One UI 6 KSU package is SOVR-Kernel-v4.2.A14_OneUI6_A50_KSU.zip, size 18,080,593 bytes, published SHA-256 891bff8122ac293d7b58ce472764bb53bec2aacf6d9323676b6ef2801dc45e82. This provides a candidate immutable reference artifact for later forensic comparison; it has not been downloaded or inspected in this session.
+- The release repository's v4.2 build.sh has the same blob SHA as this repository's main build.sh (5ab58405a3e7cb68968de9684ecaf9998888bcfb). Its defaults still select BUILD_PREF_COMPILER_VERSION='neutron', and its CLI has a generic --toolchain selector but no dedicated Clang 23.1.5 selector. The README/release compiler claim therefore cannot currently be reconciled with the default build-script path. Do not infer which compiler produced the release ZIP without inspecting build provenance or the ZIP itself.
+
+### Neutron catalogue findings
+- The Neutron catalogue's latest.txt currently identifies tag 06092026.
+- Its metadata identifies Clang 24.0.0git, LLVM commit f42c87ba2c70219b1f4ad1f031a5b6a1ea6603fb, minimum host glibc 2.43, archive size 128 MB, and SHA-256 531083928c8e37f6b31e324dbfd0b5a8323f989b1c57ff2c1368b889b5b1bd30.
+- The inspected 23052026 catalogue metadata identifies Clang 23.0.0git (not 23.1.5), LLVM commit ec4681df3d6bd1aeb9d00ee93c54eb7d4001cdff, minimum host glibc 2.43, archive size 78 MB, and SHA-256 243bb8841f57147952057256078f46618f928d4b5b8dca49b2063c18f4051b47.
+- The Neutron catalogue README states that builds track latest LLVM sources and complete stability is not guaranteed. A fixed tag and checksum make a download reproducible, but do not establish compatibility with this 4.14.357 Samsung downstream kernel.
+- No inspected Neutron release was shown to match the release notes' exact Clang 23.1.5. Do not pin the 24.0.0git or 23.0.0git archive as the known-good v4.2 compiler. Both also declare glibc 2.43, so runner compatibility must be checked before any future test.
+- The Neutron release archive and AntMan mechanism are viable research candidates only. No toolchain has been selected, installed, or tested.
+
+### Updated engineering assessment
+1. Compiler provenance is now a concrete unresolved discrepancy: release notes claim Clang/LLD 23.1.5, while the identical checked-in build script defaults to Neutron and has no 23.1.5-specific branch. The actual build invocation, compiler binary, LLD binary, LLVM commit and cross-toolchain revision must be recovered from a trusted build record or package metadata.
+2. The authentic v4.2 A14 KSU ZIP hash is recorded as a reference artifact. If binary access becomes available, inspect ZIP entries, installer, embedded Image/DTB, kernel release string, compiler strings, and embedded .config where available; verify the downloaded bytes against the published SHA-256 before trusting any extracted evidence.
+3. Keep the 4.14.357 baseline build gate ahead of Linux 5.1 source migration. No Linux 5.1 tree, compatibility patch, driver port, or target configuration has been integrated.
+4. Do not change build.sh or CI workflows until the baseline compiler and exact v4.2 build path are understood. A CI test should not silently replace the release compiler with a different LLVM generation.
+5. The immediate next task is to recover or inspect the v4.2 artifact/build provenance and reconcile Clang 23.1.5 versus Neutron. Then choose a pinned, host-compatible toolchain and reproduce the exact A50 Android 14 enforcing + KSU baseline on the migration branch.
+
+### Session validation boundary
+- Repository, branch refs, recursive source tree, migration status, build script, workflows, Neutron catalogue metadata and the separate v4.2 release metadata were inspected.
+- No kernel source, config, workflow, installer or packaging code was modified.
+- This status-document update is documentation-only.
+- No compiler was run; no .config, kernel Image, DTB/DTBO, boot image or ZIP was built or inspected.
+- No static analysis, physical boot test, flash operation or daily-driver test was performed.
+- Current phase remains Phase 0 — repository discovery / Phase 1 — forensic baseline audit. Linux 5.1 migration remains not started.
