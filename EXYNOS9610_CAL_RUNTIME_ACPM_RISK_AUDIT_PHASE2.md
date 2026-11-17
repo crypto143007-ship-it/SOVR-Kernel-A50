@@ -199,3 +199,34 @@ This is a source-level spot-check, not a complete generated parser proof of ever
 - Do not edit the vendor sequence table or change the RAW_WAIT operation yet.
 - Prioritize finding the oscillator ready-bit timing specification and validating the expected startup transition on known-good hardware.
 - Keep all source changes on the fork's migration branch and retain the known-good 4.14 recovery path.
+
+
+## 7. Phase 3: exact oscillator sequence ordering and wait semantics
+
+A focused reread of the complete descriptor and RAE implementation establishes the following ordered operations in `pmucal_lpm_init[]`:
+
+1. Write bit 31 to `OSC_CON0_OSC` at physical base `0x11860000`, offset `0x0c00`.
+2. Poll the same register until bit 29 reads as 1, using `PMUCAL_RAW_WAIT`.
+3. Only after the poll succeeds, write bit 4 to the same register.
+4. Continue with reference-clock PMU and oscillator mux configuration.
+
+The poll compares `(readl_value & BIT(29)) == BIT(29)`. It does not test bit 31, and it does not test a transition or a timeout counter.
+
+The RAE implementation confirms:
+- `PMUCAL_WAIT` uses a 1-microsecond delay and returns `-ETIMEDOUT` after its approximately 1 ms loop.
+- `PMUCAL_RAW_WAIT` is a tight `while (1)` loop around `__raw_readl()`; it does not call `udelay()`, `cpu_relax()`, or a scheduler/yield primitive.
+- The sequence dispatcher does not have a return value to propagate from the RAW_WAIT helper because the helper returns `void`.
+- `pmucal_system_init()` invokes the full LPM init sequence after P2V conversion and propagates errors from the sequence dispatcher to `cal_if_init()`.
+
+This clarifies the failure mode: if bit 29 never asserts after bit 31 is written, the executing CPU remains in the RAW_WAIT loop and the remaining oscillator/reference-clock setup is never performed. The source does not establish what bit 29 physically represents, its maximum assertion latency, or whether any silicon revision requires a special wait policy. Those facts must come from the Exynos9610 register guide, validated vendor documentation, or measured traces; they must not be guessed from the field name.
+
+### Required evidence before a code change
+
+- Identify the exact OSC_CON0_OSC register definition and bit-29 field description from the Exynos9610 PMU register guide.
+- Determine whether bit 29 is a sticky ready/status bit, a handshake acknowledgement, or another condition.
+- Establish documented min/max assertion latency and any clock-source prerequisites.
+- Confirm the sequence is identical in the known-good A50 vendor kernel/release used as the recovery baseline.
+- If adding diagnostics or a timeout, preserve the write-bit31 -> wait-bit29 -> write-bit4 ordering and ensure failure cannot proceed into the reference-clock mux steps with an unready oscillator.
+- Prefer a narrowly scoped timeout with an evidence-based bound and explicit failure propagation over a global change to every PMUCAL RAW_WAIT. Do not merge or flash such a patch until cold/warm boot and suspend/resume have been validated.
+
+No kernel implementation was modified as part of this phase. This is a source-analysis update only.
