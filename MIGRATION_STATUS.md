@@ -581,3 +581,35 @@ Finish the source/configuration and packaging preservation inventory, especially
 - No CI workflow was dispatched, no new Actions run was created, and no build was attempted. The repository search still returned no open pull requests.
 - Next step: obtain the official v4.2 release artifact and associated CI provenance. If the ZIP cannot be fetched through the connector, use a reproducible release URL/download route with checksum verification before inspection. Then run a clean baseline build in an isolated branch/workspace and archive the final config, compiler manifest, build logs and artifact hashes.
 - No kernel source, defconfig, DTS, build script, installer, workflow, or release asset was modified. Linux 5.1 migration remains not started.
+
+
+## Continuation update — v4.2 upstream release metadata cross-check (2026-11-17)
+
+### Corrected release provenance distinction
+
+- The upstream `SOVR-Technologies/SOVR-Kernel-A50` GitHub release page identifies v4.2 at tag `v4.2`, release commit `e87fe99`, dated 15 Nov.
+- The upstream release notes explicitly claim the Android 14 One UI 6+ package was built with Clang 23.1.5 / LLD 23.1.5, ThinLTO and `-O3`, and claim hardware validation on a Galaxy A50.
+- The exact v4.2 tag's `build.sh` and the current upstream `main` `build.sh` have the same Git blob SHA `5ab58405a3e7cb68968de9684ecaf9998888bcfb`. That script defaults to the Neutron toolchain branch and does not pin an immutable toolchain commit or validate the exact compiler/linker version in the script itself.
+- Therefore the release notes' Clang/LLD 23.1.5 claim is an explicit upstream release claim, but it is not independently proven by the checked-in build script. It may have been selected by the CI environment or a preinstalled toolchain. Preserve this distinction: do not label the claim false; label it not yet independently reproduced from an immutable manifest/log.
+- The v4.2 release notes list the One UI 6+ Android 14 KSU package as `SOVR-Kernel-v4.2.A14_OneUI6_A50_KSU.zip` with SHA-256 `891bff8122ac293d7b58ce472764bb53bec2aacf6d9323676b6ef2801dc45e82`. This is the published checksum, not a locally recomputed checksum.
+- The release notes describe the One UI 6+ package as pure EROFS/kernel-only installation with no legacy writable `/system` copies, and list Android 14 Mali R38P1. These are useful target-contract statements to verify against the downloaded ZIP and embedded binary, not a substitute for inspection.
+- The v4.2 notes claim eight package variants, with only the One UI 6+ Android 14 line marked hardware validated and older One UI/AOSP variants marked community beta. Do not generalize the validation claim to every variant.
+- The upstream release notes also state that the v4.2 source includes Linux 4.14.357 + OpenELA ELTS and a sync reference to 4.19.324. This is release-note provenance; the checked-in top-level Makefile independently confirms the 4.14.357 version.
+
+### Artifact retrieval status
+
+- The published v4.2 ZIP download endpoint was attempted but the binary could not be retrieved in this session. No local ZIP bytes were available for archive inspection or SHA-256 recomputation.
+- The published SHA-256 above is now recorded as the expected checksum for the exact KSU Android 14 One UI package.
+- Do not claim that the release ZIP has been downloaded, verified, unpacked, or binary-compared. Artifact validation remains blocked on obtaining the bytes.
+- The upstream v4.2 tag is available and was used to verify source files; the user's fork does not currently expose a `v4.2` ref in its own namespace. Keep upstream release/tag and fork migration branch identities separate.
+
+### Next reproducibility gate
+
+1. Obtain the exact KSU Android 14 ZIP from the upstream v4.2 release.
+2. Recompute SHA-256 and compare with `891bff8122ac293d7b58ce472764bb53bec2aacf6d9323676b6ef2801dc45e82`.
+3. Inspect ZIP contents, AnyKernel scripts, boot image handling, DTB target, module payloads, initramfs changes and all staged paths.
+4. Extract kernel Image and DTB and record hashes, strings, build banner, compiler metadata and symbol/version evidence where available.
+5. Retrieve the v4.2 release workflow/build logs (if published) and compare their commit, compiler version, environment and artifact digest.
+6. Only after the artifact and provenance agree should a clean controlled build be treated as the v4.2 baseline.
+
+No kernel source, build script, configuration, installer, workflow, release asset or main-branch file was modified in this cross-check. No binary verification, build, flash or device test was completed.
