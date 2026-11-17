@@ -155,3 +155,26 @@ Inspected the reference SoC DTS (blob `cc5814a86d1dac1215e37da6774db0a1ba581c00`
 Required: actual SM-A505F boot DTB/DTBO or live DT dump; verified memory/reserved-memory map; GIC layout and interrupt routing; PSCI version/conduit/function behavior; and a successful v5.1 DTC build.
 
 No DTS/Kconfig/Kbuild source was changed in this phase. This avoids committing a plausible but unverified early-boot description that could hang before console initialization. Next obtain `/sys/firmware/fdt` or the original DTB/DTBO and reconcile it with the reference before writing boot-critical nodes.
+
+
+## Phase 11 — uploaded live DTB and SOVR 4.2 base-DTB reconciliation (2026-11-17)
+
+The two user-supplied artifacts were inspected as binary inputs:
+
+- `A50_live.dtb` is a raw FDT (219,477 bytes).
+- `dtb.img` is an Android DT table image (134,948 bytes), with one table entry; its FDT payload begins at offset 64 and is 134,884 bytes.
+- The live FDT bootargs include `androidboot.dtbo_idx=5`. Device-specific bootargs and identifiers are intentionally excluded from repository documentation.
+- The uploaded SOVR artifact is the base DTB table/payload only. No matching SOVR 4.2 `dtbo.img` was included.
+
+### Findings that can be accepted from the uploaded blobs
+
+- Both trees describe eight CPUs (four Cortex-A53 and four Cortex-A73), PSCI using SMC, the same GIC compatible list and four register windows, and the same architectural timer PPI list.
+- The timer clock-frequency property is `0x018cba80`, i.e. 25.6 MHz.
+- The live tree declares four memory banks totalling 3.892578125 GiB. The SOVR base payload declares three 2-GiB banks totalling 6 GiB.
+- The live FDT is the running device's post-boot-chain tree; the SOVR file is only the base DTB. Because the live bootargs report a DTBO selection index and the corresponding SOVR overlay image is absent, the memory-map and node/status deltas are not a valid final-tree-to-final-tree comparison.
+
+### Implementation gate
+
+Do not create or import the A50 memory/reserved-memory nodes from the SOVR base payload. Do not conclude that SOVR 4.2 targets a 6-GiB A50 from the base payload alone. Obtain the exact matching SOVR 4.2 `dtbo.img` (and its build/selection metadata if available), identify the selected overlay corresponding to the boot chain, and compare the resulting composed tree with the live FDT. Reconcile the live RAM banks with `/proc/iomem`, `MemTotal`, and reserved/secure carveouts before writing board memory nodes.
+
+The CPU/PSCI/GIC/timer observations are evidence for a candidate minimal DTS only; each binding and driver still needs checking against upstream Linux v5.1. No boot-critical DTS source was added in this phase. No kernel/DTB build or hardware boot is claimed.
