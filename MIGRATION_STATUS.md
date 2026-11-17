@@ -743,3 +743,12 @@ No DT source or driver was modified. The next code-oriented deliverable should b
 ### Next engineering action
 
 Perform a line-by-line diff of the Vothcito and SOVR Exynos9610 clock drivers, then map every include and object in both CAL/PMUCAL Kbuild graphs. Follow with a node-level comparison of the universal9610 DTS overlay against the actual SOVR A50 device tree. Continue preserving Linux 5.1 as the requested target; do not silently switch to 5.15.
+
+
+### Follow-up source-diff finding — Exynos9610 clock / CAL
+
+- Full 389-line comparison of Vothcito and SOVR `drivers/clk/samsung/clk-exynos9610.c`: after normalizing the four relative CMUCAL/clockout include paths, all lines are identical. Only those four include paths differ.
+- Key constructs are unchanged: 169 `HWACG_VCLK` entries, 23 `init_vclk` structures, same `CLK_OF_DECLARE`, same `cal_if_init` and `samsung_clk_init` calls.
+- CAL `Makefile` is byte-for-byte identical (blob `00944ace1b772acd0193edf80792dd7b884e4c0a`).
+- This reference therefore demonstrates source relocation/layout changes, not an evidenced API-level Linux 5.15 clock/CAL port. Verify all relocated headers and Kconfig/Kbuild selections before treating it as a viable build path.
+- Detailed findings are in `EXTERNAL_REFERENCE_VOTHCITO_A50_5_15_AUDIT.md`.
