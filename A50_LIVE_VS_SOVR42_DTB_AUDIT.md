@@ -37,7 +37,7 @@ This does NOT make the DTBs interchangeable. Their memory maps, initrd placement
 - GIC register windows: 0x12301000/0x1000, 0x12302000/0x1000, 0x12304000/0x2000, 0x12306000/0x2000.
 - GIC interrupt property: cells 1, 9, 0xf04.
 - ARMv8 timer interrupt cells: 1,13,0xff08; 1,14,0xff08; 1,11,0xff08; 1,10,0xff08.
-- Timer clock-frequency: 0x018cba80 (25 MHz).
+- Timer clock-frequency: 0x018cba80 (25.6 MHz).
 
 These are observations from the uploaded blobs, not independent proof that the firmware or hardware will accept a newly built upstream v5.1 DTB.
 
