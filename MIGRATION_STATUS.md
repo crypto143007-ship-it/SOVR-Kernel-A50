@@ -714,3 +714,32 @@ A targeted parse of the current SOVR Exynos9610 SoC DTS and Universal9610/A50 bo
 5. Before implementation, produce a path-level matrix mapping every active DT compatible to its 4.14 driver source, Kconfig symbol, Makefile entry, v5.1 API delta and test method. Do not mark a node "ported" merely because its DTS compiles.
 
 No DT source or driver was modified. The next code-oriented deliverable should be this compatible-to-driver matrix, followed by a minimal compileable Exynos9610 platform patch series against a pinned v5.1 base.
+
+
+## Session update — 2026-11-17 (Vothcito reference repository audit)
+
+### Reference repository verified
+
+- Added `EXTERNAL_REFERENCE_VOTHCITO_A50_5_15_AUDIT.md` on this migration branch.
+- Reference: https://github.com/Vothcito/android_kernel_samsung_exynos9610_a50
+- Default branch: `exynos9610-port`; observed HEAD: `ace96fa34c0d8303a23c5518aae751a91274552b`.
+- Reference is Linux **5.15.211**, not Linux 5.1. Its README describes an early-stage port preparing for first functional compilation and explicitly says it is not for daily use. No successful build, boot, or physical-device test was established.
+- Reference core defconfig retains a generated Linux/arm64 4.14.194 header despite the 5.15.211 Makefile. Treat as stale/unverified config provenance, not a target config.
+- Several CAL/PMUCAL files have exact Git blob identity with SOVR's corresponding vendor source, including cal-if.c, its Makefile, cmucal.h, ra.h, vclk.h and PMUCAL headers. This corroborates source lineage but does not prove Linux 5.15 compilation or porting.
+- Its Exynos9610 clock driver is a different blob and uses a different include path while retaining Samsung CAL and custom composite/VCLK abstractions. Requires dependency-level diff.
+- The reference includes a universal9610 A50 Rev 0.1 DTS overlay with vendor PMIC/camera/display/modem details; exact SM-A505F production DTB/DTBO compatibility is unverified. Its bootargs include permissive SELinux and must not be copied.
+- Its inspected ZRAM Kconfig has standard writeback but not SOVR's custom LRU-writeback/SQZR options.
+- The expected drivers/misc/tzdev path was absent; this does not prove all secure-world code is absent elsewhere. No evidence was established for KernelSU/SuSFS parity.
+- Root listing had no .github directory; releases and pull requests were empty. No automated build or release evidence was found.
+- Reference recursive tree query was truncated at 75,300 entries; audit is targeted, not complete.
+
+### Primary repository update
+
+- Main branch remains the protected baseline; no source code, config, workflow, package, or installer was changed.
+- Migration branch now contains the new comparative audit document.
+- New commit: `5fcfb83f3f5db0fbaf772a1652d4f926b966bec7`.
+- The reference is retained as read-only comparative evidence. Do not merge or import source wholesale.
+
+### Next engineering action
+
+Perform a line-by-line diff of the Vothcito and SOVR Exynos9610 clock drivers, then map every include and object in both CAL/PMUCAL Kbuild graphs. Follow with a node-level comparison of the universal9610 DTS overlay against the actual SOVR A50 device tree. Continue preserving Linux 5.1 as the requested target; do not silently switch to 5.15.
