@@ -52,3 +52,31 @@ The vendor Makefile conditionally builds `composite.o` and `clk-exynos9610.o` un
 ## Current disposition
 
 **Blocked / discovery required.** The first real porting unit is the CAL + CMUCAL + composite dependency boundary, not the Exynos9610 clock table alone. The next code change should follow a complete symbol/dependency inventory and API diff.
+
+
+## Follow-up dependency findings (vendor source)
+
+The public vendor header `include/soc/samsung/cal-if.h` (blob `65fe05a30e4251b0ca9d735ddbb29d7713374ac5`) makes the configuration split explicit:
+
+- With `CONFIG_PWRCAL`, it includes the vendor `pwrcal.h` implementation and supplies inline no-op implementations for `cal_qch_init()` and `cal_if_init()`. This branch must not be mistaken for proof that the full CMUCAL runtime is present.
+- Without `CONFIG_PWRCAL`, it includes `pmucal_system.h` and declares the CAL clock, power-domain, PM, CPU/cluster, DFS, ASV, CP, GNSS, and initialization interfaces. These are a much larger platform contract than the clock provider alone.
+- The header also declares `cal_clk_setrate`, `cal_clk_getrate`, `cal_clk_enable`, and `cal_clk_disable`; any CCF adapter must preserve their error and rate semantics rather than silently returning success.
+
+The vendor `drivers/soc/samsung/cal-if/Makefile` (blob `00944ace1b772acd0193edf80792dd7b884e4c0a`) builds:
+- core CAL/CMUCAL objects (`cal-if.o`, `cmucal.o`, `ra.o`, `vclk.o`, `pll_spec.o`) under separate configuration symbols;
+- PMUCAL objects under `CONFIG_PMUCAL`;
+- ACPM DVFS / FVMAP under `CONFIG_ACPM_DVFS`;
+- the Exynos9610-specific `cal_data.o` under `CONFIG_SOC_EXYNOS9610`.
+
+The vendor `drivers/clk/samsung/composite.h` defines custom PLL, mux, divider, gate, user-mux, and virtual-clock descriptor structures and registration functions. It also carries vendor-specific VCLK flags including DFS and QCH operations. Therefore, even where upstream CCF offers a similarly named clock type, semantic equivalence is not established.
+
+### Revised dependency boundary
+
+Treat the clock port as a dependency graph with at least four independently audited layers:
+
+1. **CCF adapter / composite layer** — clock descriptor types, operations, registration, locking, and parent handling.
+2. **CMUCAL layer** — virtual-clock IDs, Q-channel/node data, VCLK operations and SoC-specific `cal_data.o`.
+3. **PMUCAL / firmware layer** — power sequencing, PMU state, ACPM communication and any firmware-mediated DVFS behavior.
+4. **SoC clock provider / DTS layer** — Exynos9610 provider initialization, binding IDs, parent clocks, and every consuming DTS node.
+
+Do not select the `CONFIG_PWRCAL` stub path as a shortcut unless the complete build configuration and runtime call graph prove that all required clock and power operations are implemented elsewhere. A stubbed initialization routine can make compilation look easier while leaving hardware clocks or power domains uncontrolled.
