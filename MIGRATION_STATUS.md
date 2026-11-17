@@ -356,3 +356,52 @@ Finish the source/configuration and packaging preservation inventory, especially
 - No compiler was run; no .config, kernel Image, DTB/DTBO, boot image or ZIP was built or inspected.
 - No static analysis, physical boot test, flash operation or daily-driver test was performed.
 - Current phase remains Phase 0 — repository discovery / Phase 1 — forensic baseline audit. Linux 5.1 migration remains not started.
+
+
+## Continuation update — 2026-11-17 10:05 PKT
+
+### Exact live repository refs
+- Default branch `main`: `e87fe99406053025d97b361fe18cc8faf6e416c6`.
+- Assessment branch `migration/linux-5.1-assessment`: `8506b2feb53ca6f6285f6908c56952bc57cec5c5`, commit message `docs(migration): record toolchain and baseline build findings`.
+- Live compare: assessment branch is **13 commits ahead, 0 behind** main. The only aggregate changed path remains `MIGRATION_STATUS.md`; no kernel source, configuration, DTS/DTBO, build script, workflow, installer or package has been changed on this branch.
+- Main recursive tree remains 72,306 entries, complete and not truncated.
+- Current repository Actions API response: `total_count=0`, `workflow_runs=[]`. This is an API-observed result at this session, not proof that no external or historical builds ever existed.
+- Two workflows are present: `.github/workflows/development.yml` and `.github/workflows/galaxy-a50.yml`. No PRs were returned by repository-scoped PR search; no issue entries were returned by the repository-scoped issue search.
+- `MIGRATION_PLAN.md` remains absent on the assessment branch. The status document is the only migration-specific file currently added relative to main.
+
+### Build and workflow source inspection
+- `build.sh` is the existing Mint/Fresh-derived build entry point. Its default compiler variables are `BUILD_PREF_COMPILER='clang'` and `BUILD_PREF_COMPILER_VERSION='neutron'`.
+- The default Neutron path expects `$HOME/toolchains/neutron-clang`; when it is absent, the verification path exits. The script's repository-local clone of `TenSeventy7/exynos9610_toolchains_fresh` is not by itself proof that the required Neutron directory has been provisioned.
+- The script's make/configuration, clean/mrproper, Magisk-update, toolchain-clone and ZIP commands contain pipelines ending in `sed`; script-level `set -e` and `set -o pipefail` are not established. This remains a confirmed failure-propagation defect.
+- `.github/workflows/development.yml` triggers only on `workflow_dispatch`; its `version` input says “Build KSU” but the build invocations do not consume it and invoke Magisk or non-KSU paths.
+- `.github/workflows/galaxy-a50.yml` triggers on `workflow_dispatch` and pushes to `android-*`; it has no PR trigger for the migration branch.
+- Both workflows upload artifacts and have release-publishing jobs. Keep their release behavior separate from any future non-release baseline validation workflow.
+- No workflow was dispatched during this session.
+
+### Toolchain provenance — catalogue cross-check
+- Neutron's published catalogue currently reports tag `06092026` as Clang `24.0.0git`, LLVM commit `f42c87ba2c70219b1f4ad1f031a5b6a1ea6603fb`, minimum host glibc `2.43`, archive SHA-256 `531083928c8e37f6b31e324dbfd0b5a8323f989b1c57ff2c1368b889b5b1bd30`.
+- Catalogue tag `30062026` reports Clang `23.0.0git`, LLVM commit `12628715ce61c8db841211eb8683e2f53fa74f0b`, minimum host glibc `2.43`, archive SHA-256 `b473a420d693a4e3bc71b56ec4283c0e3738f87d6ac37fa202bb0be5e0a07521`.
+- The catalogue's current latest pointer is `06092026`. The release list inspected contains no Neutron catalogue release explicitly identified as Clang `23.1.5`.
+- LLVM upstream does publish the official LLVM/Clang `23.1.5` release (3 November 2026). This is **not equivalent evidence** to a Neutron bare-metal kernel toolchain release. Do not silently replace the repository's Neutron toolchain with the upstream LLVM distribution; the required cross-binutils, host-library assumptions, build flags and SOVR build compatibility have not been established.
+- Neutron's catalogue documentation says builds track LLVM sources and warns that complete stability cannot be guaranteed. AntMan supports selecting a dated tag and verifies the archive against the catalogue SHA-256. This is a viable integrity mechanism only after the exact compiler build is selected and tested.
+- References: https://github.com/Neutron-Toolchains/clang-build-catalogue/releases ; https://github.com/Neutron-Toolchains/clang-build-catalogue ; https://github.com/Neutron-Toolchains/antman ; https://github.com/llvm/llvm-project/releases/tag/llvmorg-23.1.5
+
+### Authentic v4.2 release metadata
+- The README links v4.2 release assets from the separate `SOVR-Technologies/SOVR-Kernel-A50` repository, not the current `crypto143007-ship-it/SOVR-Kernel-A50` repository.
+- The upstream v4.2 release metadata is available and lists eight ZIP assets. The A14 One UI 6 KSU asset is `SOVR-Kernel-v4.2.A14_OneUI6_A50_KSU.zip`, 18,080,593 bytes, release-published SHA-256 `891bff8122ac293d7b58ce472764bb53bec2aacf6d9323676b6ef2801dc45e82`.
+- Release metadata and hashes were inspected; the ZIP binary itself was not downloaded or unpacked. Therefore its embedded kernel image, compiler identity, DTB/DTBO, installer and build metadata remain unverified in this session.
+- Upstream release URL: https://github.com/SOVR-Technologies/SOVR-Kernel-A50/releases/tag/v4.2
+
+### Engineering decision / validation boundary
+- The SOVR README's advertised Clang `23.1.5` and the Neutron catalogue releases inspected do not yet identify a matching, verifiable Neutron archive. This provenance mismatch is a blocker to selecting a pinned CI compiler.
+- Do not use the latest Neutron tag merely because it is available; do not assume the official LLVM 23.1.5 release is interchangeable with the expected Neutron toolchain.
+- Do not add a baseline CI workflow with an unverified compiler selection. First establish the authentic v4.2 toolchain provenance, or explicitly define and test a candidate compiler while clearly labeling the result as a new baseline experiment rather than a reproduction of v4.2.
+- No kernel source, defconfig, workflow, installer, or package was modified. No compiler/build was run, no generated config or artifact was produced, and no physical device operation or test was performed. Linux 5.1 migration remains **not started**.
+
+### Next exact engineering actions
+1. Investigate the upstream v4.2 build provenance and any build metadata embedded in its published release assets; distinguish advertised LLVM version from the actual compiler binary.
+2. Inspect the remaining `build.sh` control flow and device database to document every environment variable, toolchain path, config merge, image/DTB/DTBO build step, packaging step and cleanup/rollback dependency.
+3. Complete the canonical A50 config and fragment inventory, including both defconfigs and all Android/ROM/Mali/SELinux/KSU fragment variants.
+4. Reproduce the Linux 4.14.357 build using an authenticated, pinned toolchain. Capture the final `.config`, `UTS_RELEASE`, Image, DTB/DTBO, boot image, ZIP contents and build logs.
+5. Only after the baseline is reproducible, implement a separate manual, non-release CI validation workflow on this branch; then address pipeline failure propagation with regression tests.
+6. Keep `main` untouched and do not begin Linux 5.1 source replacement until the baseline and preservation matrix are complete.
