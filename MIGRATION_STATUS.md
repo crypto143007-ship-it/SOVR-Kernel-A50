@@ -474,3 +474,57 @@ Finish the source/configuration and packaging preservation inventory, especially
 - The default DTS declares system/vendor/product as ext4 (system disabled, vendor enabled, product present). The AOSP14 DTS declares system and vendor as ext4 (system disabled); it has no product fstab node in the inspected region.
 - This is a concrete reason not to collapse the One UI 14 and AOSP DTB selections into one generic “Android 14 EROFS” tree. The One UI 14 vendor/product EROFS declarations are part of the ROM-specific boot contract and must be preserved.
 - The user's One UI-based EROFS ROM does not justify assuming every partition is EROFS. The inspected DTS specifically describes vendor/product as EROFS and system as ext4/disabled. The actual on-device partition formats and fstab remain the final authority.
+
+
+## Continuation update — 2026-11-17 (ROM config composition and installer asset audit)
+
+### Exact build configuration composition
+
+- The live `build.sh` selects `arch/arm64/configs/exynos9610-a50_core_defconfig` as the base for A50 builds. It creates a temporary config by copying that file, then appends the following fragments from `kernel/configs/`:
+  1. `mint_partial-deknox-${BUILD_ANDROID_PLATFORM}.config`
+  2. `mint_mali-${BUILD_ANDROID_PLATFORM}.config`
+  3. `mint_variant_${BUILD_KERNEL_CODE}.config`
+  4. KSU/SuSFS or explicit non-root settings
+  5. SELinux enforcing or permissive settings
+  6. Magisk pre-root or non-root initramfs settings
+  7. `CONFIG_MINT_PLATFORM_VERSION=${BUILD_ANDROID_PLATFORM}`
+- The fragment merge is a direct append to the temporary defconfig before the make defconfig target is invoked. The effective final `.config` is therefore the result of Kconfig resolution, not a simple concatenation; conflicts and unmet symbols must be checked from a real generated config.
+- The fragment directory is `kernel/configs`, not `arch/arm64/configs`. Earlier fragment-path shorthand should be read accordingly.
+
+### Verified Android 14 configuration details
+
+- `kernel/configs/mint_mali-14.config` selects `CONFIG_MALI_BIFROST_R38P1=y`, disables the older R16P0/R19P0/R25P1/R26P0/R32P1 variants, and enables the Exynos Mali platform integration, DVFS, PM, RTPM, QoS, thermal, BTS and device-tree support.
+- This is a source-level selection. It does not prove the matching userspace/vendor Mali stack on the user's ROM is compatible or that GPU operation has been tested.
+- `kernel/configs/mint_variant_oneui.config` enables `CONFIG_MINT=y`, `CONFIG_MINT_SESL=y`, Samsung SCSC WLBT daemon support, the EFS Wi-Fi MAC path `/efs/wifi/.mac.info`, up to three WLAN interfaces, AP interface `swlan0`, Samsung MTP and Knox NCM.
+- `kernel/configs/mint_variant_aosp.config` enables `CONFIG_MINT=y`, disables `CONFIG_MINT_SESL` and `CONFIG_SCSC_WLBTD`, uses the vendor EFS path `/mnt/vendor/efs/wifi/.mac.info`, allows up to twelve WLAN interfaces, selects AP interface `wlan1`, and enables early devtmpfs mounting for Treble/GSI bootstrap.
+- The Android 14 `mint_partial-deknox-14.config` fragment still enables FIVE, FIVE TEE/TZDEV integration, integrity signatures, fscrypt SDP and SDP. The fragment name must not be interpreted as removing every Samsung security/integrity dependency.
+- `mint_selinux-enforcing.config` selects `CONFIG_ALWAYS_ENFORCE=y`, disables SELinux switching and permissive fallback. The build script separately adds KSU/SuSFS settings or explicitly disables KSU, then merges the SELinux and root/initramfs fragments.
+- The above fragment files are inputs to the config build, not proof that every symbol survives Kconfig resolution. The final generated `.config` and build log are required for definitive confirmation.
+
+### Installer assets and ROM branch mapping
+
+- `build_package()` stages common AnyKernel assets first, then chooses only the target-specific asset directory:
+  - AOSP: `files_aosp` plus `patch/init.zram.rc`.
+  - One UI Android 11: `files_oneui` plus RAM Plus/Pageboost patches.
+  - One UI Android 12/13: `files_fresh`.
+  - One UI Android 14+: no legacy One UI/Fresh asset directory is copied by this branch.
+- The omission of legacy One UI assets for Android 14+ is consistent with `mint.sh`: SDK 34/35/36 takes the pure SOVR-default branch and does not install the legacy One UI 3/4 or Fresh 4/5 performance assets.
+- The installer uses ROM detection and SDK detection at flash time; the build variant selects which assets are even available inside the ZIP. Both sides of this contract must remain aligned during migration.
+- AOSP's installer branch installs the ZRAM writeback overlay APK, ZRAM fstab and init service under `/vendor`, patches vendor properties and adjusts vendor init swap actions. This is a distinct AOSP integration and must not leak into the user's One UI package.
+- One UI Android 14+ relies on the kernel/ROM's existing SOVR defaults and EROFS-compatible path rather than copying the legacy writable-system performance files. Preserve this behavior unless a future ROM-specific requirement is demonstrated.
+
+### Build-path risks reaffirmed
+
+- The functions `build_dtb()` and `build_dtbo()` in `build.sh` are legacy helper functions and are not called in the final build flow. DTB/DTBO generation is handled by Kbuild dependencies as documented above.
+- The normal package path moves raw `Image` and `dtb_exynos.img` into the package staging directory; it does not stage `dtbo_exynos.img`.
+- The standalone `tools/make/boot.img` is generated before packaging but is not the boot payload used by the AnyKernel installer. The installer repacks the existing boot image with `split_boot` / `flash_boot` and separately flashes the DTB partition.
+- `build.sh` currently copies ROM-specific DTS over the shared source path, then uses `git checkout` to restore it. This remains unsafe with pre-existing local edits and concurrent variant builds.
+- The current source installer hard-codes `/dev/block/platform/13520000.ufs/by-name/dtb`. This must be verified against the exact device partition map before any new installer is built or used.
+
+### Engineering decisions
+
+1. Treat the base defconfig plus all fragments as one versioned ROM target configuration. A migration matrix must map Android SDK, ROM family, Mali DDK, SCSC settings, security/TZDEV dependencies, KSU/SuSFS and initramfs mode.
+2. Do not replace R38P1 or alter Mali configuration based only on upstream kernel availability. First identify the matching vendor/userspace DDK and preserve the Exynos-specific Mali platform glue.
+3. Preserve the One UI Android 14 no-legacy-assets installer path and the separate AOSP ZRAM writeback path.
+4. Before any build-script repair, capture the exact current v4.2 output and verify package contents. The existing pipeline failure propagation and DTS restore hazards remain candidates for isolated fixes with regression tests.
+5. No kernel source, configuration fragment, workflow, installer, or release file was changed in this audit. No compiler build, ZIP installation, physical-device flash or boot test was performed. Linux 5.1 migration remains not started.
