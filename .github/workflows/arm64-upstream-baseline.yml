@@ -46,13 +46,13 @@ jobs:
 
       - name: Configure clean upstream ARM64 defconfig
         run: |
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- HOSTCFLAGS=-fcommon defconfig
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -s kernelversion
           grep -E '^(CONFIG_ARCH_EXYNOS|CONFIG_EXYNOS_THERMAL|CONFIG_SERIAL_SAMSUNG)=' .config || true
 
       - name: Build upstream ARM64 Image and DTBs
         run: |
-          make -j2 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image dtbs
+          make -j2 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- HOSTCFLAGS=-fcommon Image dtbs
 
       - name: Publish baseline build outputs
         uses: actions/upload-artifact@v4
