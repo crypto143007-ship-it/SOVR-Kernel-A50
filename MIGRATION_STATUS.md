@@ -613,3 +613,33 @@ Finish the source/configuration and packaging preservation inventory, especially
 6. Only after the artifact and provenance agree should a clean controlled build be treated as the v4.2 baseline.
 
 No kernel source, build script, configuration, installer, workflow, release asset or main-branch file was modified in this cross-check. No binary verification, build, flash or device test was completed.
+
+
+## Continuation update — GitHub Actions coverage audit (2026-11-17)
+
+### Workflow inventory and target coverage
+
+The migration branch contains two workflow definitions under `.github/workflows/`:
+
+- `.github/workflows/development.yml` — named "Development Build (Galaxy A50)"; trigger is `workflow_dispatch` only. Its jobs invoke `build.sh` for Android 12 One UI, Android 12 AOSP, and Android 11 One UI/AOSP variants, including enforcing/permissive and Magisk variants. It does not define an Android 14 One UI 6+ job, nor a Linux 5.1 source target.
+- `.github/workflows/galaxy-a50.yml` — named "Stable Release Build (Galaxy A50)"; triggers on `workflow_dispatch` and pushes to branches matching `android-*`. Its jobs likewise build Android 11/12 One UI and AOSP variants. It does not define an Android 14 One UI 6+ job or a Linux 5.1 migration target.
+
+Both workflows use `actions/checkout@v4` and call the existing `build.sh`; neither workflow is an independent migration/build harness. The fact that a workflow can be manually dispatched from a branch does not make its current job matrix a valid Android 14 / Linux 5.1 test.
+
+### Observed Actions and PR state
+
+- GitHub's Actions runs endpoint queried for `migration/linux-5.1-assessment` returned `total_count: 0` at the time of this audit. No workflow run has been observed for this branch.
+- A repository-scoped open-PR search returned no open pull requests. There is currently no pending PR to merge or close.
+- A fresh comparison reports `migration/linux-5.1-assessment` is 20 commits ahead of `main`, 0 behind, with only `MIGRATION_STATUS.md` added/changed relative to the common base. Main remains untouched.
+
+### CI design implications and risks to address
+
+1. Add a separate migration workflow rather than repurposing the legacy Android 11/12 release matrix. It should be manually dispatchable on the migration branch and should build the exact Android 14 One UI 6+ KSU configuration first, then a non-KSU variant only after the first target is reproducible.
+2. Pin the source ref/SHA, toolchain repository commit, compiler and linker versions, and action dependencies. Record the effective `.config`, source SHA, toolchain SHA, build log, Image/DTB hashes and ZIP hash as artifacts.
+3. Make CI fail closed: validate required inputs and output files, enable shell pipeline failure propagation, run archive integrity and required-entry checks, and do not publish a release if any validation step fails.
+4. Keep migration CI separate from stable release publication. Do not let a Linux 5.1 experiment publish or overwrite production release tags/assets.
+5. Add static checks before compilation (shell syntax/ShellCheck, config fragment resolution, expected One UI EROFS/Mali/SCSC/KSU selections) and preserve the exact generated config for review.
+
+### Current conclusion
+
+The repository's present Actions workflows do not provide Android 14 / One UI 6+ or Linux 5.1 migration coverage. There are no observed Actions runs on the migration branch and no open PRs. This is a CI coverage gap, not evidence that a kernel build failed. No workflow was dispatched or modified in this audit; no build, flash or physical-device test was performed. Linux 5.1 migration remains not started.
