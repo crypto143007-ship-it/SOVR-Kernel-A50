@@ -465,3 +465,12 @@ Finish the source/configuration and packaging preservation inventory, especially
 - Generated Image, DTB, DTBO and boot.img: not built or inspected.
 - No compiler run, static analysis, physical device test, flash or boot validation performed.
 - Linux 5.1 migration remains not started.
+
+
+### DTS variant comparison — additional finding
+- Fetched the default, One UI 14, AOSP 14 and legacy AOSP Exynos9610 DTS sources from live `main`.
+- `aosp14/exynos9610.dts` and `aosp/exynos9610.dts` are byte-identical at Git blob SHA `acd2fecbb1521bc094216b03ff1dd548ed0e1533`; the Android 14 AOSP copy currently adds no DTS delta over legacy AOSP.
+- The One UI 14 DTS differs materially in its Android fstab declarations: `vendor` and `product` are changed from `ext4` to `erofs`, and the product entry is enabled. The `system` entry remains `ext4` and disabled in the inspected DTS.
+- The default DTS declares system/vendor/product as ext4 (system disabled, vendor enabled, product present). The AOSP14 DTS declares system and vendor as ext4 (system disabled); it has no product fstab node in the inspected region.
+- This is a concrete reason not to collapse the One UI 14 and AOSP DTB selections into one generic “Android 14 EROFS” tree. The One UI 14 vendor/product EROFS declarations are part of the ROM-specific boot contract and must be preserved.
+- The user's One UI-based EROFS ROM does not justify assuming every partition is EROFS. The inspected DTS specifically describes vendor/product as EROFS and system as ext4/disabled. The actual on-device partition formats and fstab remain the final authority.
