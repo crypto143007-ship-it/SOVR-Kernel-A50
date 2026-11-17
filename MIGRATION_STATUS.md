@@ -752,3 +752,35 @@ Perform a line-by-line diff of the Vothcito and SOVR Exynos9610 clock drivers, t
 - CAL `Makefile` is byte-for-byte identical (blob `00944ace1b772acd0193edf80792dd7b884e4c0a`).
 - This reference therefore demonstrates source relocation/layout changes, not an evidenced API-level Linux 5.15 clock/CAL port. Verify all relocated headers and Kconfig/Kbuild selections before treating it as a viable build path.
 - Detailed findings are in `EXTERNAL_REFERENCE_VOTHCITO_A50_5_15_AUDIT.md`.
+
+
+## Session update — 2026-11-17 (ACPM IPC source hardening and baseline correction)
+
+### ACPM implementation work
+
+- Modified only `drivers/soc/samsung/acpm/acpm_ipc.c` on `migration/linux-5.1-assessment`.
+- Added NULL/error checks for IPC/debug allocations, channel buffers, workqueues, IRQ mapping and MMIO resources.
+- Added basic channel-property and channel-descriptor sanity checks.
+- Corrected the `acpm_ipc_send_data()` argument guard so NULL configuration/command and out-of-range channel IDs are rejected.
+- Changed log-buffer initialization to return and propagate allocation/mapping failures.
+- Implementation commits:
+  - `5003200b573a88dea8a316f742caf6d0c07d5a0f`
+  - `a32ee15fffaf9480a429445971c8816809b93640`
+- Detailed scope and known limitations are recorded in `EXYNOS9610_CAL_RUNTIME_ACPM_RISK_AUDIT_PHASE2.md`, Phase 8.
+
+### Critical target-version clarification
+
+The current repository working tree's top-level Makefile reports **Linux 4.14.357** (both the migration branch and main at the time checked). The A50 default defconfig file is generated from Linux/arm64 4.14.113. Therefore the ACPM code just modified is still the vendor 4.14 source; it is a pre-port hardening change, NOT a Linux 5.1 port or proof of Linux 5.1 API compatibility.
+
+The separate pinned upstream Linux v5.1 baseline workflow builds vanilla upstream ARM64 defconfig only. It does not compile this vendor tree or the modified ACPM source. No workflow run, target-tree compile, DTB build, or hardware boot is claimed here.
+
+### Remaining safety blockers
+
+- Complete SRAM/firmware offset and queue-index bounds validation.
+- Correct IRQ registration/masking order after studying the mailbox protocol.
+- Full probe failure unwind, singleton lifetime, IRQ mapping and workqueue teardown.
+- Static analysis and actual compile of the modified 4.14 vendor tree.
+- Create a separate integration branch/worktree based on pinned upstream v5.1 before claiming any porting work; port ACPM into that v5.1 tree with explicit API/Kconfig/Kbuild integration.
+- Run the A50-specific build and device validation only after all dependencies are integrated.
+
+Main remains unchanged by this session. No pull request was created against either repository. The original SOVR repository remains out of scope.
