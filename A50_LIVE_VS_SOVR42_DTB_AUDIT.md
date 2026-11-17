@@ -64,10 +64,18 @@ The live DTB declares 3.893 GiB across fragmented low memory plus one 2-GiB high
 - 468 nodes exist only in the live tree, including board/peripheral and platform configuration nodes. Many corresponding nodes in the SOVR tree are absent or disabled. A broad import of either tree would silently change hardware enablement.
 - One node exists only in SOVR: `/memory@900000000`, which is part of the additional 2-GiB high-memory bank.
 
+## Important overlay caveat
+
+The live FDT is the device tree presented to the running kernel after the boot chain has selected/applied its board configuration. Its bootargs include `androidboot.dtbo_idx=5`. The uploaded SOVR `dtb.img` is an Android DT table containing one base FDT entry; no matching `dtbo.img` was supplied in this upload. Therefore the 468-node delta, peripheral enablement differences, and RAM-map differences may partly or wholly reflect a DTBO overlay applied to the live tree rather than a difference in the underlying base DTS.
+
+Do not treat the base-DTB comparison alone as proof that the SOVR 4.2 tree targets a 6-GiB handset. It proves only that this particular base FDT declares three 2-GiB memory banks. The matching SOVR 4.2 DTBO image and selected overlay entry are required to determine the final 4-GiB board tree. Likewise, the live bank total of 3.893 GiB must be reconciled with its reserved/secure carveouts and running memory map.
+
+Next required artifact for a definitive comparison: the SOVR 4.2 `dtbo.img` (or the exact overlay blob selected by the SOVR boot chain), plus the bootloader's DTBO selection metadata if available.
+
 ## Decision for Linux 5.1 port
 
 1. Treat `A50_live.dtb` as the primary description of the currently running 4-GiB device, subject to validation against `/proc/iomem`, `MemTotal`, and the bootloader's DT/DTBO selection.
-2. Treat SOVR 4.2 `dtb.img` as a comparison artifact, not a drop-in DTB.
+2. Treat SOVR 4.2 `dtb.img` as a base-tree comparison artifact, not a drop-in final board DTB; obtain its matching DTBO before concluding how the final board memory map is formed.
 3. Reuse matching CPU/PSCI/GIC/timer facts only after checking Linux v5.1 binding/driver compatibility.
 4. Do not import SOVR memory nodes, initrd addresses, empty bootargs, or disabled-node state into the new upstream DTS.
 5. Build the first upstream DTS with a minimal, validated early-boot subset; add board peripherals only alongside their compatible drivers and dependencies.
