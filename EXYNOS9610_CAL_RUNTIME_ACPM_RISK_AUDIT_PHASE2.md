@@ -406,3 +406,77 @@ The base DTS defines the clock controller with IPC channel 0, ACPM framework cha
 | Linux 5.1 probe ordering and runtime | Not tested |
 
 This phase updates documentation only; no DTS or kernel implementation files were modified.
+
+
+## 11. Phase 7: ACPM transport resource, SRAM-window and probe failure-path audit
+
+This phase re-read the exact base-DT resource tuple and the complete IPC probe/channel initialization code. It refines the earlier ACPM risk notes and records concrete defects to fix in a dedicated implementation patch.
+
+### 11.1 Corrected physical memory arithmetic
+
+The DT declares IPC resource 1 as:
+- SRAM base: `0x02039000`
+- SRAM length: `0x15000` (86,016 bytes)
+- End-exclusive physical address: `0x0204E000`
+
+The firmware init-data offset is `0x6F00`, so its mapped address is `sram_base + 0x6F00`. This is within the declared window, but that fact alone does not validate any nested firmware-provided offsets.
+
+The dump region is declared separately as physical `0x0203C000`, length `0x12000`; its end-exclusive address is `0x0204E000`, exactly the end of the SRAM resource. The dump range is therefore adjacent to and fully contained in the same physical SRAM window, assuming the DT resource values reflect the hardware memory map. The code currently calls plain `ioremap()` for this range even though the same physical region is already covered by the devm resource mapping. The port should avoid creating overlapping mappings where practical and should use a consistent mapping/ownership model.
+
+### 11.2 Probe ordering and failure hazards
+
+The current IPC probe:
+1. Allocates the global `acpm_ipc` structure.
+2. Parses and requests the IRQ.
+3. Maps mailbox resource 0.
+4. Maps SRAM resource 1.
+5. Reads `initdata-base` and derives the framework pointer.
+6. Calls log initialization and channel initialization.
+7. Creates workqueues and starts optional periodic logging.
+
+This order has several concrete hazards:
+
+- `devm_kzalloc()` failure is checked with `IS_ERR()`, although it returns NULL. The code then dereferences `acpm_ipc`.
+- IRQ registration occurs before mailbox/SRAM mappings and firmware channel state are initialized. An interrupt arriving in this interval can reach a handler that accesses global IPC state before it is ready. Reorder setup so all handler-visible state is valid before enabling/requesting the IRQ, or explicitly mask and safely acknowledge the source until initialization completes.
+- The IRQ number from `irq_of_parse_and_map()` is not checked for zero/error before `devm_request_threaded_irq()`.
+- Both `platform_get_resource()` results should be checked before passing them to `devm_ioremap_resource()`.
+- `initdata-base` is checked for property presence but not for property length or whether the complete framework structure fits inside the mapped SRAM.
+- `channel_init()` trusts firmware-provided `ipc_ap_max`, channel IDs, queue element sizes/counts, and offsets. It does not validate channel-table bounds, unique/in-range IDs, multiplication overflow, ring-buffer bounds, front/rear pointer bounds, or indirection-buffer bounds.
+- The channel-array allocation and each per-channel command allocation are not checked for NULL.
+- `log_buffer_init()` also checks a `devm_kzalloc()` result with `IS_ERR()`, and does not validate firmware-provided timestamp/log offsets or sizes. It can continue with a NULL debug structure or invalid MMIO pointers.
+- `create_freezable_workqueue()` results are not checked before work is queued.
+- The IPC remove callback does not tear down global state/workqueues or unmap the separately ioremapped dump range. This matters if probe failure, unbind, or module unload is possible; built-in-only assumptions must be explicit if cleanup is intentionally omitted.
+
+### 11.3 DVFS channel error path refined
+
+The DVFS init function requests the main channel and logs a negative return, but unconditionally registers the DVFS platform driver afterward. The platform driver's probe separately requests the MIF notification channel and returns a negative error if that request fails. The main channel failure can therefore leave the driver registered with an invalid channel ID/size and allow later DVFS calls to use incomplete state. The Linux 5.1 port should propagate the main-channel failure or use a well-defined deferred/retry mechanism, with correct channel release if registration subsequently fails.
+
+### 11.4 Safe implementation sequence
+
+Do not add isolated NULL checks without a complete initialization/unwind design. The recommended patch series is:
+
+1. Add a single checked resource-acquisition path: validate IRQ, both resources, mappings, property lengths, and framework header bounds.
+2. Validate the firmware channel table and every derived queue/indirection/timestamp/log region using overflow-safe range helpers against the mapped SRAM length.
+3. Allocate and initialize channel state, locks, completions, workqueues, and all handler-visible data before unmasking or requesting the IRQ.
+4. Define the interrupt mask/acknowledgement order from the existing firmware protocol; do not assume the mailbox can be left unmasked during setup.
+5. Make every allocation and workqueue failure return a negative errno and unwind in reverse order.
+6. Make DVFS main-channel acquisition failure prevent registration, and release the channel if later registration fails.
+7. Add remove/error cleanup for workqueues, IRQ, channel callbacks, and mappings, consistent with devm lifetime.
+8. Build with the exact A50 configuration and test cold boot, warm reboot, suspend/resume, DVFS transitions, MIF notifications, and ACPM logging on hardware.
+
+### 11.5 Current status
+
+| Gate | Status |
+|---|---|
+| SRAM physical range arithmetic | Source-DT arithmetic checked |
+| Dump range containment | Ends exactly at SRAM end |
+| Framework header bounds | Not yet implemented |
+| Firmware channel/ring bounds | Not yet implemented |
+| IRQ-before-state initialization race | Identified in source |
+| NULL-vs-ERR_PTR allocation checks | Identified in source |
+| Workqueue/allocation unwind | Not implemented |
+| DVFS main-channel error propagation | Identified in source |
+| Linux 5.1 compatibility patch | Not yet written |
+| Runtime validation | Not performed |
+
+No executable kernel code or DTS was changed in this phase. The next implementation should be a separate, reviewable ACPM hardening commit on this fork branch, not an unbounded rewrite of the transport.
