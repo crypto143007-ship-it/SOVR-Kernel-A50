@@ -643,3 +643,39 @@ Both workflows use `actions/checkout@v4` and call the existing `build.sh`; neith
 ### Current conclusion
 
 The repository's present Actions workflows do not provide Android 14 / One UI 6+ or Linux 5.1 migration coverage. There are no observed Actions runs on the migration branch and no open PRs. This is a CI coverage gap, not evidence that a kernel build failed. No workflow was dispatched or modified in this audit; no build, flash or physical-device test was performed. Linux 5.1 migration remains not started.
+
+
+## Continuation update — Linux v5.1 mainline versus A50 Exynos9610 platform gap (2026-11-17)
+
+### Direct source comparison
+
+Compared the repository's current `main` platform files against the upstream Torvalds Linux `v5.1` tag. This is a source-tree comparison, not a successful build or runtime test.
+
+**The upstream v5.1 tag does not contain the Exynos9610/A50 platform enablement present in this SOVR source tree:**
+
+- SOVR `arch/arm64/Kconfig.platforms` defines `CONFIG_SOC_EXYNOS9610` and selects Samsung SoC, Exynos architecture, CPU-frequency, timer, clock, pinctrl and DMA support. The upstream v5.1 file has the generic `ARCH_EXYNOS` option but no `SOC_EXYNOS9610` option.
+- SOVR `arch/arm64/boot/dts/exynos/Makefile` builds `exynos9610.dtb`, `exynos9610-universal9610.dtbo` and `exynos9611-universal9611.dtbo`. The upstream v5.1 Exynos DT Makefile lists only Exynos5433 and Exynos7 boards; its Exynos DTS directory has no Exynos9610 DTS/DTSI files.
+- SOVR includes `drivers/clk/samsung/clk-exynos9610.c` (28,366 bytes; blob `1ecdd4ea5b66601c2a68a1d8eefaf992505b2061`). The upstream v5.1 Samsung clock directory has no Exynos9610 clock driver and its Makefile has no `CONFIG_SOC_EXYNOS9610` object entry.
+- SOVR's Exynos9610 clock implementation includes Samsung CAL/CMUCAL headers under `drivers/soc/samsung/cal-if/exynos9610/`. That directory contains SoC-specific CMUCAL node/QCH/VCLK data, clock-out definitions and PMUCAL headers. The parent CAL framework and Exynos9610-specific data are not present in upstream v5.1's `drivers/soc/samsung`, which contains only the upstream PMU and power-domain files.
+- SOVR has a full SoC description in `arch/arm64/boot/dts/exynos/exynos9610.dts` (101,492 bytes; blob `88c6b7b54cf493b44de0812f54255a56562c59b4`) and the A50/Universal9610 board overlay `exynos9610-universal9610.dts` (30,932 bytes; blob `eadc27822e505fc989274984097cbf4b7e32ffbd`). The v5.1 upstream Exynos DTS directory does not contain these files.
+- SOVR includes Samsung TrustZone/TZDEV under `drivers/misc/tzdev/`, including `tz_deploy_tzar.c`, secure-world transport, ION fd-to-physical support and the `startup.tzar*` payload files. Upstream v5.1's `drivers/misc` directory has no `tzdev` implementation. This is particularly important given the previously observed A50 TZDEV/TEEGRIS deployment failures: replacing it with an upstream generic secure-world interface is not a safe substitute.
+
+### Consequence for the porting strategy
+
+A direct replacement of the 4.14 source with vanilla Linux v5.1 is not a viable A50 port. The upstream v5.1 tree lacks the SoC identity/configuration, DT, clock/CAL/PMUCAL and TZDEV foundations required by this device. These are not optional performance features; they are part of the platform bring-up and secure boot/runtime path.
+
+The migration must therefore be treated as a **vendor-platform forward port onto a v5.1 kernel base**, not as a simple upstream version bump:
+
+1. Preserve the SOVR Exynos9610 platform support as a coherent patch series: SoC Kconfig/Makefiles, DTS/DT bindings, pinctrl, clock/CAL/CMUCAL, PMUCAL, power domains, regulators, thermal/devfreq, storage and other board-critical drivers.
+2. Port dependencies in layers and compile after each layer. Do not copy the entire 4.14 driver tree blindly; resolve each 5.1 API/Kconfig/locking/DMA/PM-runtime interface change and remove obsolete duplicate framework code.
+3. Keep TZDEV/TEEGRIS deployment and the A50 boot chain as explicit hard gates. Preserve the known working 4.14 implementation until its 5.1 port is demonstrably correct; do not remove or replace startup TZAR payloads as a speculative fix.
+4. Treat the A50 board DTS and One UI EROFS fstab/boot arguments as separate board/vendor contracts. A successful generic Exynos compile does not prove the A50 DTB/DTBO, display, touch, UFS, modem, camera, audio, Wi-Fi or suspend/resume paths work.
+5. First create a reproducible vanilla v5.1 arm64 cross-build baseline, then add the platform support in dependency order and keep a bootable 4.14 fallback artifact. Do not flash until a complete package passes static checks and has a tested recovery path.
+
+### Version lifecycle warning
+
+Linux 5.1 is a 2019 non-LTS release series and is not listed among kernel.org's current longterm branches. The current kernel.org release table lists longterm branches 5.10, 5.15, 6.1, 6.6, 6.12 and 6.18, but not 5.1. A 5.1-based device kernel therefore needs an explicit maintainer-owned security/backport policy; the version number alone does not provide ongoing upstream stable support. This lifecycle warning does not change the requested 5.1 target, but it must be part of the project's acceptance criteria.
+
+### Current conclusion
+
+The first major technical blocker is now evidenced directly: vanilla Linux v5.1 has no Exynos9610/A50 platform support stack corresponding to the SOVR 4.14 tree. The migration scope is substantially larger than rebasing generic kernel code. No kernel code, DTS, Kconfig, driver or workflow was changed in this comparison. No compilation, device flash or boot test was performed.
