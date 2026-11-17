@@ -230,3 +230,57 @@ This clarifies the failure mode: if bit 29 never asserts after bit 31 is written
 - Prefer a narrowly scoped timeout with an evidence-based bound and explicit failure propagation over a global change to every PMUCAL RAW_WAIT. Do not merge or flash such a patch until cold/warm boot and suspend/resume have been validated.
 
 No kernel implementation was modified as part of this phase. This is a source-analysis update only.
+
+
+## 8. Phase 4: PMUCAL descriptor-to-P2V source audit
+
+A balanced-parenthesis, string-aware macro argument scan was run over the six Exynos9610 PMUCAL sequence headers after removing C block and line comments. The scan recognizes all ten arguments of `PMUCAL_SEQ_DESC`; it does not assume descriptors fit on one line.
+
+### 8.1 Source inventory
+
+| Sequence header | Descriptor definitions | Active RAW_WAIT descriptors in source |
+|---|---:|---:|
+| pmucal_system_exynos9610.h | 2,344 | 1 |
+| pmucal_local_exynos9610.h | 373 | 0 |
+| pmucal_cpu_exynos9610.h | 51 | 0 |
+| pmucal_cp_exynos9610.h | 34 | 0 |
+| pmucal_gnss_exynos9610.h | 31 | 0 |
+| pmucal_shub_exynos9610.h | 35 | 0 |
+| **Total** | **2,868** | **1** |
+
+The P2V table contains 58 literal `DEFINE_PHY()` entries.
+
+### 8.2 Address coverage result
+
+For every parsed descriptor in these six files:
+- Every nonzero literal base physical address matched an entry in the P2V table.
+- Every nonzero literal condition-base physical address matched an entry in the P2V table.
+- A literal zero condition-base is a sentinel meaning no separate condition register; it is intentionally excluded from P2V lookup.
+- No nonzero literal unmapped address was found.
+- No non-literal base/condition-base expression was found by this scan.
+
+This corrects an earlier preliminary scan that mistakenly treated the valid zero sentinel as an unmapped address. It also confirms the previously noted `0x12300000` CP address does not occur in an active descriptor after C comments are stripped.
+
+### 8.3 Limits of this result
+
+This is a lexical source audit, not a full C preprocessor evaluation. It counts descriptor definitions after comment removal, including any definitions inside conditional-compilation branches. It does not prove every descriptor is linked into a particular binary or reachable at runtime. A full configuration-specific result still requires preprocessing with the exact A50 defconfig, include paths, generated headers, and compiler flags.
+
+The scan also validates address membership, not mapping correctness: it does not prove the physical register exists on every board revision, the mapping size is sufficient, or the register access is safe at every call site.
+
+### 8.4 Reference repository comparison
+
+The exact blob SHA for `pmucal_system_exynos9610.h` and `pmucal_p2vmap_exynos9610.h` in the separately supplied Vothcito reference repository matches the fork's corresponding blobs. This confirms the files are byte-identical at the checked revision, but it is not independent corroboration of the hardware sequence or register semantics.
+
+### 8.5 Updated status
+
+| Gate | Status |
+|---|---|
+| Nonzero literal PMUCAL base-address membership | Passed for six scanned headers |
+| Nonzero literal PMUCAL condition-base membership | Passed for six scanned headers |
+| Zero condition-base sentinel handling | Corrected and documented |
+| Preprocessor-selected descriptor inventory | Still open |
+| Register-map correctness / silicon revision coverage | Not established |
+| OSC bit-29 hardware meaning and timing | Not established |
+| Linux 5.1 compile and A50 runtime validation | Not performed |
+
+No kernel source implementation was changed. This phase adds reproducible source-audit findings only.
