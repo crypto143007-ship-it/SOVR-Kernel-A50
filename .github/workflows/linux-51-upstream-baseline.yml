@@ -2,6 +2,12 @@ name: Linux 5.1 Upstream ARM64 Baseline
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - migration/linux-5.1-assessment
+    paths:
+      - '.github/workflows/linux-51-upstream-baseline.yml'
+      - 'LINUX_51_BASELINE.md'
 
 permissions:
   contents: read
