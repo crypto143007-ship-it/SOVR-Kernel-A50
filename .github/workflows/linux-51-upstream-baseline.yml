@@ -22,12 +22,6 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 90
     steps:
-      - name: Checkout SOVR migration branch (audit metadata)
-        uses: actions/checkout@v4
-        with:
-          ref: migration/linux-5.1-assessment
-          path: sovr
-
       - name: Install cross-build dependencies
         run: |
           sudo apt-get update
