@@ -291,3 +291,38 @@ For the 4 GB target, preserve the exact Samsung/SOVR three-bank declaration and 
 ### Validation gate
 
 Before changing any memory-related property or memory initialization code, compare the Linux 5.1 result with the known-good SOVR kernel on the 4 GB handset: final FDT, memblock bank list, reserved-memory carveouts, CMA, secure/TEE and multimedia regions, DMA masks, and stress-test results. A mismatch must be explained before device testing. The 6 GB release target still requires a real 6 GB device or stock firmware evidence before claiming verified support.
+
+
+## First Exynos9610 SoC DTS integration — 2026-11-18
+
+A first real device-tree source integration has now been committed to the Linux 5.1 branch (commit `93e50791b18f81a71209e592db411783a5773666`). This is beyond the earlier Kconfig-only smoke test.
+
+### Source selection
+
+- The base `arch/arm64/boot/dts/exynos/exynos9610.dts` was taken from the original SOVR main repository, because the user's explicit priority is to preserve the existing SOVR hardware/boot behaviour.
+- The supporting Exynos9610 SoC `.dtsi` files and missing DT binding headers were taken from Vothcito's `exynos9610-port` reference.
+- The SOVR and Vothcito top-level `exynos9610.dts` files are not byte-identical. The SOVR copy is therefore deliberately the target base; Vothcito remains the supplementary source for missing includes/bindings, not an override of SOVR's base DTS.
+
+### Files added
+
+- SoC DTS: `exynos9610.dts`.
+- Includes: pinctrl, reserved-memory, debug, SysMMU, PM domains, MFC, camera, and TMU sensor configuration.
+- Binding headers: Exynos9610 clocks, DM, devfreq, BCM debug, debug snapshot, secure log, SysMMU, FIMC-IS, power domains, and UFS.
+- `arch/arm64/boot/dts/exynos/Makefile` now lists `exynos9610.dtb` under `CONFIG_ARCH_EXYNOS`.
+
+The imported DTS is a SoC-level reference DTB, not yet the complete A50 product DTBO set. A50 board/revision overlays remain a separate next stage and must continue to match Samsung stock `dt.img`/`dtbo.img` selection.
+
+### Memory compatibility rule
+
+The SOVR base DTS retains the original three-bank `reg` entries at `0x80000000`, `0x880000000`, and `0x900000000`, each with a 2 GiB declared size. No memory entry was resized, collapsed, removed, or rewritten in this integration commit. Continue to treat this as the known-good SOVR DT declaration; do not equate the sum of declared address ranges with Linux-usable RAM on the user's 4 GB handset.
+
+### Build validation
+
+Commit `93e50791b18f81a71209e592db411783a5773666` triggered Actions run `44252241410`. The run was in progress when this entry was written. Its required gate is successful compilation of the new `exynos9610.dtb` together with the existing ARM64 Image/DTBs. A green generic build alone does not establish bootability or correct runtime driver support.
+
+### Remaining work after DTB compile
+
+1. Fix only concrete DTS compile errors exposed by CI; do not strip nodes or bindings merely to make the build green.
+2. Compare the resulting DTB's three memory banks and reserved-memory nodes against the Samsung stock DTB and working SOVR output.
+3. Add the A50 board/revision DTBO source set with stock revision mapping.
+4. Port the required Linux 5.1 drivers for pinctrl, SysMMU, PM domains, clocks/CAL, ACPM and board devices in dependency order.
