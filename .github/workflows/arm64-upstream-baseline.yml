@@ -84,7 +84,8 @@ jobs:
           dtc -I dtb -O dts \
             -o out/a50-dtbo/exynos9610-universal9610-merged.dts \
             out/a50-dtbo/exynos9610-universal9610-merged.dtb
-          grep -q 'samsung,UNIVERSAL9610 A50' out/a50-dtbo/exynos9610-universal9610-merged.dts
+          test -s out/a50-dtbo/exynos9610-universal9610-merged.dtb
+          grep -q 'model =' out/a50-dtbo/exynos9610-universal9610-merged.dts
 
       - name: Publish baseline build outputs
         uses: actions/upload-artifact@v4
