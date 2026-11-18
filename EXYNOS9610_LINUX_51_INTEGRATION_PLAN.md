@@ -221,3 +221,18 @@ The next code patch must be deliberately small and reviewable:
 4. Keep the clock provider, CAL/PMUCAL and ACPM disabled until their source/API/Kconfig dependency closures are separately ported and built.
 
 The existing live-vs-SOVR DTB audit shows that memory/reserved-memory and overlay composition are not yet safe to reconstruct from the SOVR base DTB alone. Do not fabricate a minimal bootable A50 DTS from incomplete evidence.
+
+
+### Integration-branch CI confirmation
+
+The integration branch's own workflow also completed successfully:
+
+- Run: https://github.com/crypto143007-ship-it/SOVR-Kernel-A50/actions/runs/44138869824
+- Job: `arm64-baseline`; every step succeeded.
+- Artifact: `linux-v5.1-arm64-upstream-baseline` (10,243,680 bytes; artifact ID `14354471777`).
+- Downloaded artifact inspection: 231 DTBs and one ARM64 Image (20,492,800 bytes; SHA-256 `5361b85304b5f8be83de720fc43f8e5aad951172e8a4240901ce1c0812e3d753`).
+- Exynos DTBs are again only Exynos5433 TM2/TM2E and Exynos7 Espresso. No Exynos9610/A50 DTB is present.
+
+This is a successful build of the clean upstream integration branch itself, not merely the separate assessment branch. The artifact still contains no A50-specific `.config`; the workflow builds generic upstream `defconfig`.
+
+**Current status remains: upstream ARM64 baseline green; Exynos9610 vendor integration not yet implemented.** No Image from either baseline artifact is suitable for A505F flashing.
