@@ -268,3 +268,16 @@ The current bring-up handset is the 4 GB SM-A505F. Its memory map cannot be used
 ### Release gate
 
 Do not mark the A50 family port complete, publish it as supporting 6 GB, or ship a fixed-memory DTB until both 4 GB and 6 GB boot paths have passed memory-map and stress validation. If bootloader-supplied memory discovery is confirmed on both, prefer that shared path over hardcoded SKU-specific memory sizes.
+
+
+### Reference DTS memory-map finding (audit only; not adopted)
+
+A fresh read of the Vothcito Linux 5.15 reference `arch/arm64/boot/dts/exynos/exynos9610.dts` found three explicit memory nodes at lines 137–149:
+
+- `0x00000000_80000000`, size `0x80000000` (2 GiB)
+- `0x00000008_80000000`, size `0x80000000` (2 GiB)
+- `0x00000009_00000000`, size `0x80000000` (2 GiB)
+
+This describes a 6 GiB total map with non-contiguous physical banks in that reference DTS. It is useful evidence that the platform may have high-address RAM banks, and that a naive single contiguous 4/6 GiB declaration would be unsafe. It does **not** establish that this exact map applies to every A50 SKU, firmware, or bootloader. The 4 GiB layout cannot be derived by simply deleting one bank, and this reference DTS is Linux 5.15 WIP, not the target v5.1 board contract.
+
+Action: keep the reference values out of the target DTS until captured from actual 4 GB and 6 GB devices (live FDT plus `/proc/iomem` and kernel memblock logs). In particular, ensure the 64-bit address cells, bank order, reserved-memory ranges and DMA limits are all checked together. This finding strengthens the requirement for shared SoC/board source plus bootloader-validated RAM discovery or SKU-specific memory-only variants.
