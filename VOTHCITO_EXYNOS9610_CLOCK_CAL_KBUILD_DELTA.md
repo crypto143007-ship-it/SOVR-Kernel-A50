@@ -88,3 +88,46 @@ Do not bring FLEXPMU into the first bootable A50 Linux 5.1 milestone. First port
 5. the non-FLEXPMU baseline boots and passes suspend/resume and CPU hotplug tests.
 
 This is a source-level risk assessment only; no hardware validation is claimed.
+
+
+## Correction and deeper source verification — FLEXPMU / PMUCAL
+
+This section supersedes any earlier wording that implied FLEXPMU is an enabled, selectable feature in the inspected Vothcito branch.
+
+### Kconfig and build truth
+
+The complete inspected `drivers/soc/samsung/Kconfig` (114 lines) defines `CAL_IF`, `CMUCAL`, `PMUCAL` and unrelated Samsung SoC options, but contains no `FLEXPMU` symbol. The inspected `drivers/soc/samsung/cal-if/Makefile` has:
+
+- `obj-y += cal-if.o`
+- `obj-$(CONFIG_PMUCAL) += pmucal_system.o pmucal_local.o pmucal_cpu.o pmucal_rae.o`
+- `obj-$(CONFIG_FLEXPMU) += pmucal_powermode.o`
+- `obj-$(CONFIG_SOC_EXYNOS9610) += exynos9610/cal_data.o`
+
+The inspected `pmucal_system.c`, `pmucal_cpu.c`, `cal-if.c` and `pmucal_powermode.h` guard FLEXPMU-specific declarations/calls with `#ifdef CONFIG_FLEXPMU`, or provide no-op inline stubs when it is not defined. Therefore, **unless a different included Kconfig file defines FLEXPMU, the reference branch's FLEXPMU-specific code is not selected by normal Kconfig configuration**. The symbol's repository-wide provenance remains unverified; the absence in this one complete Kconfig file is now directly confirmed.
+
+### Corrected CAL data path
+
+There is no `drivers/soc/samsung/cal-if/exynos9610/Makefile` in the inspected reference. The actual selection is the root `drivers/soc/samsung/cal-if/Makefile` rule for `exynos9610/cal_data.o`. That translation unit includes the Exynos9610 PMUCAL headers and CMUCAL data C fragments. The earlier shorthand describing an Exynos9610 subdirectory Makefile should not be relied on.
+
+### A50 topology facts from the reference data
+
+- `pmucal_cpu_exynos9610.h` declares `pmucal_cpu_list_size = 8` and `pmucal_cluster_list_size = 2`.
+- `pmucal_p2vmap_exynos9610.h` declares `pmucal_p2v_list_size = 58`.
+- The PMUCAL CPU-inform table itself was not located in the inspected Exynos9610 headers or by the available repository code-search index. Its existence, size, CPU numbering and register addresses are therefore **not verified** by this audit. Do not infer that 8 CPU entries means the CPU-inform table has exactly 8 entries.
+
+### Concrete FLEXPMU risk boundary
+
+The helper computes a linear physical CPU index from MPIDR affinity fields and directly indexes `pmucal_cpuinform_list[phycpu]` in both hint and clear paths. No bounds check is present in those two functions. The init function resolves each configured `base_pa` by matching it against the 58-entry P2V map and returns `-ENOENT` if a mapping is absent. If FLEXPMU is ever enabled, review must establish:
+1. every possible A50 MPIDR-derived index is below `cpu_inform_list_size`;
+2. the CPU-inform table entries correspond to the actual A50 physical CPU topology;
+3. each `base_pa` maps to a valid P2V entry;
+4. the hint register offsets and access ordering are valid on A505F silicon; and
+5. initialization completes before any CPU hotplug, cluster powerdown or system suspend path can issue a hint.
+
+### Revised Linux 5.1 recommendation
+
+Keep FLEXPMU out of the first port. The minimum CAL dependency sequence to validate is:
+`cal_if_init() -> ect_parse_binary_header()/vclk_initialize() -> cal_data_init() -> pmucal_rae_init() -> pmucal_system_init() -> pmucal_local_init() -> pmucal_cpu_init()`.
+Then verify the clock-provider and PM-domain callers that invoke this interface, their init ordering, and the DT/regmap resources they require. Do not claim this sequence is complete until all callers and initcall sites have been traced.
+
+This is static source inspection only; no compile or device test was run.
