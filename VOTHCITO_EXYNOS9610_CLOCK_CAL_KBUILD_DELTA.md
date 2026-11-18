@@ -58,3 +58,33 @@ A direct blob comparison was completed for all four headers included by the Voth
 This confirms that the four-file duplicate directory is currently a byte-identical mirror, not a separately maintained implementation. It does not remove the future drift risk; a Linux 5.1 port should choose one canonical source location and keep any compatibility include path generated or mechanically verified.
 
 A GitHub code-search attempt for `CONFIG_FLEXPMU`, `pmucal_powermode` and `pmucal_powermode_init` returned no indexed matches. This is an index limitation, not proof that the symbol or callers are absent. The FLEXPMU Kconfig definition, call graph, init ordering and object dependencies remain open audit items and must be traced from the actual source tree before enabling the object.
+
+
+## Follow-up verification — FLEXPMU implementation and enablement risk
+
+Reference source inspected directly at `Vothcito/android_kernel_samsung_exynos9610_a50:exynos9610-port`:
+
+- `drivers/soc/samsung/cal-if/Makefile` builds `pmucal_powermode.o` when `CONFIG_FLEXPMU` is set.
+- `drivers/soc/samsung/cal-if/pmucal_powermode.c` implements `pmucal_powermode_hint()`, `pmucal_powermode_hint_clear()` and `pmucal_cpuinform_init()`.
+- `pmucal_system.c` calls the hint functions around system powerdown and early wakeup when FLEXPMU is enabled.
+- `pmucal_cpu.c` calls the hint functions on CPU and cluster enable/disable paths.
+- `cal-if.c` adds a spinlock around CPU/cluster CAL operations when FLEXPMU is enabled and calls `pmucal_cpuinform_init()` after PMUCAL CPU initialization.
+- The hint implementation reads MPIDR_EL1, converts affinity fields to a linear physical CPU index, then indexes `pmucal_cpuinform_list[phycpu]` without a visible bounds check in this function. Its correctness depends on the CPU-inform table covering every possible computed index and on the table having been initialized successfully.
+- `pmucal_cpuinform_init()` resolves each CPU-inform physical base address through the PMUCAL physical-to-virtual list and fails with `-ENOENT` if an entry is absent. That means enabling FLEXPMU changes a real initialization failure path, not just optional logging or tuning.
+
+### Kconfig finding — not yet proven selectable
+
+The inspected Vothcito `drivers/soc/samsung/Kconfig` defines `CAL_IF`, `CMUCAL` and `PMUCAL`, but the inspected file does not define `FLEXPMU`. The SOVR `drivers/soc/samsung/Kconfig` inspected on `main` likewise has no `FLEXPMU` definition. GitHub indexed code search returned no matches for `FLEXPMU`, but search-index absence is not proof that no other Kconfig source defines it.
+
+Therefore the correct status is **unresolved Kconfig provenance**. Do not set `CONFIG_FLEXPMU=y` in the A50 defconfig or port the object until a repository-wide Kconfig/source scan identifies the symbol definition (or confirms it is undefined). If it is truly undefined, the Makefile entry is dead conditional code under normal Kconfig generation and the guarded C paths will not be compiled.
+
+### Linux 5.1 port decision
+
+Do not bring FLEXPMU into the first bootable A50 Linux 5.1 milestone. First port the minimum CAL/PMUCAL functionality needed for CPU/cluster and system power management with FLEXPMU disabled. Only consider FLEXPMU as a later, separately reviewed feature after:
+1. symbol definition and selection dependencies are located;
+2. CPU-inform table dimensions are proven against A50 MPIDR topology;
+3. every CPU-inform PA is present in the PMUCAL PA-to-VA table;
+4. spinlock context and hint register ordering are reviewed against the A50 suspend/hotplug call paths; and
+5. the non-FLEXPMU baseline boots and passes suspend/resume and CPU hotplug tests.
+
+This is a source-level risk assessment only; no hardware validation is claimed.
