@@ -98,3 +98,51 @@ The A50 common overlay pulls in board-specific modem, LCD, camera, sound, MST an
 ## Current status
 
 The source audit has identified the main port groups and their dependency boundaries. The first Kconfig selector is a deliberately small source change. Exynos9610 driver, DTB and A50 board support are **not yet integrated**. The next pass is to compile the selector smoke test, then map the DTS include/binding closure before importing hardware nodes.
+
+## Follow-up DTS dependency audit — exact Vothcito source files
+
+The Vothcito `exynos9610-port` tree was re-opened and the direct include closure was inspected. This is a source inventory only; no Vothcito DTS has been copied into the Linux 5.1 branch yet.
+
+### SoC DTS direct includes
+
+`arch/arm64/boot/dts/exynos/exynos9610.dts` directly includes:
+
+- `dt-bindings/clock/exynos9610.h`
+- `dt-bindings/interrupt-controller/arm-gic.h`
+- `exynos9610-pinctrl.dtsi`
+- `exynos9610-rmem.dtsi`
+- `exynos9610-debug.dtsi`
+- `dt-bindings/thermal/thermal.h`
+- `dt-bindings/ufs/ufs.h`
+- `exynos9610-sysmmu.dtsi`
+- `dt-bindings/soc/samsung/exynos9610-dm.h`
+- `exynos9610-pm-domains.dtsi`
+- `dt-bindings/soc/samsung/exynos9610-devfreq.h`
+- `exynos9610-mfc.dtsi`
+- `dt-bindings/soc/samsung/exynos-bcm_dbg.h`
+- `exynos9610-camera.dtsi`
+
+This is a broad vendor SoC DTS, not a minimal board description. Its nodes advertise many vendor-only devices (ACPM, ITMON, Exynos clock, pinctrl, USI, HSI2C, audio/ABOX, devfreq, camera, MFC, SysMMU, etc.). Enabling every node before its matching 5.1 driver and binding is ported would produce a misleading or unsafe DTB.
+
+### A50 board-level source
+
+The Vothcito `arch/arm64/boot/dts/samsung/exynos9610-a50_common.dtsi` directly includes:
+
+- `dt-bindings/camera/fimc_is.h`
+- `dt-bindings/clock/exynos9610.h`
+- `modem-s337ap-sipc-pdata.dtsi`
+- `display-lcd_a50_common.dtsi`
+- `exynos9610-a50_camera.dtsi`
+- `exynos9610-a50_sound.dtsi`
+- `exynos9610-a50_mst_03.dtsi`
+- `exynos9610-inputbooster.dtsi`
+
+It also describes PMIC, USB-PD, touch, hall, grip, modem/shared-memory and other board devices. These are separate dependencies and must be reconciled with the exact stock `dt.img` base and `dtbo.img` overlay selected on the user's A50. The Samsung stock DT table/overlay contract remains authoritative; Vothcito board files are supplementary evidence, not replacements.
+
+### Build gate update
+
+The integration branch's current CI run `44248431736` has passed checkout, ARM64 dependency installation and the Exynos9610 Kconfig selector configuration/assertions. The actual generic ARM64 Image/DTB build is still running at the time of this audit. This is only a selector smoke test, not an Exynos9610 driver or A50 DTB build.
+
+### Safe next code gate
+
+Before adding a DTB target, enumerate the actual stock DTB root and overlay composition, then create a minimal DTS that retains the known Samsung/SOVR three-bank memory entries and only enables nodes with upstream-5.1-compatible providers. Add the necessary binding headers and SoC nodes in small, independently compiled groups. Do not pull the entire A50 common DTSI or every SoC peripheral node in one patch.
