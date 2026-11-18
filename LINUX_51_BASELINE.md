@@ -34,3 +34,22 @@ The workflow is manual and has not been dispatched by this session. No build res
 ## Next step after baseline succeeds
 
 Create a separate integration workspace or branch based on the pinned upstream commit, then apply one minimal platform patch series at a time. Keep the baseline workflow immutable and add a second, clearly named vendor-integration workflow only when the first Exynos9610 patch series exists. Do not publish or flash a boot image until DTB/DTBO, TZDEV, UFS, display, touch, connectivity, suspend/resume and recovery acceptance gates are met.
+
+
+## Session update — 2026-11-18: baseline build automation
+
+The manual-only baseline workflow now also has a narrowly scoped push trigger for updates to:
+- `.github/workflows/linux-51-upstream-baseline.yml`
+- `LINUX_51_BASELINE.md`
+
+It remains restricted to branch `migration/linux-5.1-assessment`, and still builds only the immutable upstream Linux v5.1 commit `e93c9c99a629c61837d5a7fc2120cd2b6c70dbdd` using ARM64 defconfig, then `Image dtbs`. Permissions remain `contents: read`; no release, package, signing, deployment, or device-flash steps were added.
+
+Workflow-trigger change commit: `e88e6ab3f96ed52331ffc271dc2337ea00cef81d`.
+
+### Execution status
+
+The workflow definition was fetched again after the change and its trigger block was verified. The connected GitHub Actions tool surface available in this session does not expose workflow-dispatch or a general list-runs operation. The commit's combined status currently returns no status entries. Therefore a run is **not yet confirmed**, and no successful compile is claimed. Check the repository's Actions tab for the run named **Linux 5.1 Upstream ARM64 Baseline**.
+
+### Critical scope distinction
+
+The migration branch's kernel top-level Makefile still declares Linux 4.14.357. The upstream v5.1 build job checks out a separate Torvalds Linux tree and does not compile SOVR's modified ACPM source or any Exynos9610 vendor code. It is only a compiler/upstream-baseline check. A separate vendor integration tree based on the pinned v5.1 commit is still required before an A50 kernel build can be attempted.
