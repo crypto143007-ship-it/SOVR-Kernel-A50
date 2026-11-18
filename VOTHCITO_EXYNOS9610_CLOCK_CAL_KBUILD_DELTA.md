@@ -42,3 +42,19 @@ Vothcito's Exynos9610 clock-driver relocation is accompanied by a material Kbuil
 - No source, Kconfig, Makefile, DTS, defconfig, workflow, installer or release was changed in either SOVR or Vothcito.
 - No build, flash, boot or hardware validation is claimed.
 - Original `SOVR-Technologies/SOVR-Kernel-A50` remains untouched.
+
+
+## Follow-up verification — all four mirrored clock headers
+
+A direct blob comparison was completed for all four headers included by the Vothcito clock driver. For every header, the copy under `drivers/soc/samsung/exynos9610/`, the copy under `drivers/soc/samsung/cal-if/exynos9610/`, and the SOVR `cal-if/exynos9610/` copy have identical Git blob IDs:
+
+| Header | Identical blob in all three locations |
+|---|---|
+| `cmucal-vclk.h` | `95bed84ad2b46c342f948a431b7c524ada8deb4a` |
+| `cmucal-node.h` | `81ba3058001177fdcd62f08051f2c2ec30d26a45` |
+| `cmucal-qch.h` | `5eb21beb0d7802fa43c8f611163ea67bb268ed64` |
+| `clkout_exynos9610.h` | `49abfdf57f42f32b993879283ed608fb1796bbce` |
+
+This confirms that the four-file duplicate directory is currently a byte-identical mirror, not a separately maintained implementation. It does not remove the future drift risk; a Linux 5.1 port should choose one canonical source location and keep any compatibility include path generated or mechanically verified.
+
+A GitHub code-search attempt for `CONFIG_FLEXPMU`, `pmucal_powermode` and `pmucal_powermode_init` returned no indexed matches. This is an index limitation, not proof that the symbol or callers are absent. The FLEXPMU Kconfig definition, call graph, init ordering and object dependencies remain open audit items and must be traced from the actual source tree before enabling the object.
