@@ -53,3 +53,25 @@ The workflow definition was fetched again after the change and its trigger block
 ### Critical scope distinction
 
 The migration branch's kernel top-level Makefile still declares Linux 4.14.357. The upstream v5.1 build job checks out a separate Torvalds Linux tree and does not compile SOVR's modified ACPM source or any Exynos9610 vendor code. It is only a compiler/upstream-baseline check. A separate vendor integration tree based on the pinned v5.1 commit is still required before an A50 kernel build can be attempted.
+
+
+## Verified CI failure diagnosis — 2026-11-18
+
+Two push-triggered runs were inspected, not merely inferred from their red status:
+
+- Run 1: https://github.com/crypto143007-ship-it/SOVR-Kernel-A50/actions/runs/44232897949
+- Run 2: https://github.com/crypto143007-ship-it/SOVR-Kernel-A50/actions/runs/44232918720
+
+Both completed checkout and ARM64 defconfig successfully, then failed while building host-side DTC. Logs showed:
+- `aarch64-linux-gnu-gcc: not found` because Ubuntu's installed GCC 10 cross package exposes a version-suffixed executable.
+- `multiple definition of yylloc` while linking `scripts/dtc/dtc`, due to the old Linux 5.1 host DTC code and modern GCC's default `-fno-common`.
+
+The workflow was corrected in commit `67801066b38d80b6c60a6556cea48b604dec38eb`:
+- Create the expected `aarch64-linux-gnu-gcc` executable as a symlink to `aarch64-linux-gnu-gcc-10`.
+- Pass `HOSTCFLAGS=-fcommon` to the Linux 5.1 build to restore the common-symbol behavior expected by its bundled DTC.
+
+The corrected workflow is expected to trigger a new run from the migration branch push. Its result must be checked before calling the baseline successful. The previous failed artifacts contained source identity and defconfig evidence only; they did not contain a completed kernel Image or DTBs.
+
+### Scope reminder
+
+This remains an upstream baseline only. It is not an Exynos9610/SOVR vendor integration build and does not validate A505F hardware.
