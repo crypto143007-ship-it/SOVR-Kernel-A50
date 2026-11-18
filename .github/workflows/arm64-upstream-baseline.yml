@@ -59,6 +59,24 @@ jobs:
           make -j2 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- HOSTCFLAGS=-fcommon Image dtbs
           cp .config exynos9610-smoke.config
 
+      - name: Compile Samsung A50 UNIVERSAL9610 DTBO from SOVR 4.2 sources
+        run: |
+          set -eux
+          mkdir -p out/a50-dtbo
+          cpp -nostdinc \
+            -I include \
+            -I arch/arm64/boot/dts \
+            -I arch/arm64/boot/dts/exynos \
+            -undef -D__DTS__ -x assembler-with-cpp \
+            arch/arm64/boot/dts/exynos/exynos9610-universal9610.dts \
+            > out/a50-dtbo/exynos9610-universal9610.pp.dts
+          dtc -@ -I dts -O dtb \
+            -o arch/arm64/boot/dts/exynos/exynos9610-universal9610.dtbo \
+            out/a50-dtbo/exynos9610-universal9610.pp.dts
+          strings arch/arm64/boot/dts/exynos/exynos9610-universal9610.dtbo | grep -q 'samsung,UNIVERSAL9610 A50'
+          strings arch/arm64/boot/dts/exynos/exynos9610-universal9610.dtbo | grep -q '__fixups__'
+          strings arch/arm64/boot/dts/exynos/exynos9610-universal9610.dtbo | grep -q '__symbols__'
+
       - name: Publish baseline build outputs
         uses: actions/upload-artifact@v4
         with:
@@ -67,4 +85,5 @@ jobs:
           path: |
             arch/arm64/boot/Image
             arch/arm64/boot/dts/**/*.dtb
+            arch/arm64/boot/dts/**/*.dtbo
             exynos9610-smoke.config
