@@ -75,3 +75,6 @@ The corrected workflow is expected to trigger a new run from the migration branc
 ### Scope reminder
 
 This remains an upstream baseline only. It is not an Exynos9610/SOVR vendor integration build and does not validate A505F hardware.
+
+
+A follow-up CI efficiency correction was committed as `d09b3b7e300b5f1cae8027d9fc157d34cbf8bc7d`: the baseline workflow no longer performs a redundant full checkout of the large SOVR migration repository. The job builds only the separately pinned upstream tree, and the removed checkout was not referenced by any build or evidence step. This reduces runner time and avoids fetching the 4.14 vendor tree just to compile vanilla upstream Linux.
