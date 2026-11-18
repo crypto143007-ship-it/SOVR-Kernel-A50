@@ -270,14 +270,24 @@ The current bring-up handset is the 4 GB SM-A505F. Its memory map cannot be used
 Do not mark the A50 family port complete, publish it as supporting 6 GB, or ship a fixed-memory DTB until both 4 GB and 6 GB boot paths have passed memory-map and stress validation. If bootloader-supplied memory discovery is confirmed on both, prefer that shared path over hardcoded SKU-specific memory sizes.
 
 
-### Reference DTS memory-map finding (audit only; not adopted)
+### Authoritative SOVR / Samsung memory-map baseline (project decision)
 
-A fresh read of the Vothcito Linux 5.15 reference `arch/arm64/boot/dts/exynos/exynos9610.dts` found three explicit memory nodes at lines 137–149:
+The three-bank memory declaration below is **not merely a Vothcito reference**. It is present in the original SOVR Exynos9610 DTS and in the Samsung stock DTB extracted from the user's original stock firmware archive. The user confirms that their physical 4 GB A50 boots and runs the existing SOVR kernel using this arrangement. Therefore this exact three-entry layout is the compatibility baseline for the migration and must not be removed, collapsed into one contiguous range, resized to 4 GiB, or otherwise "corrected" solely because the handset is sold as a 4 GB model.
+
+The Vothcito Linux 5.15 reference `arch/arm64/boot/dts/exynos/exynos9610.dts` and original SOVR DTS both declare:
 
 - `0x00000000_80000000`, size `0x80000000` (2 GiB)
 - `0x00000008_80000000`, size `0x80000000` (2 GiB)
 - `0x00000009_00000000`, size `0x80000000` (2 GiB)
 
-This describes a 6 GiB total map with non-contiguous physical banks in that reference DTS. It is useful evidence that the platform may have high-address RAM banks, and that a naive single contiguous 4/6 GiB declaration would be unsafe. It does **not** establish that this exact map applies to every A50 SKU, firmware, or bootloader. The 4 GiB layout cannot be derived by simply deleting one bank, and this reference DTS is Linux 5.15 WIP, not the target v5.1 board contract.
+The Samsung stock archive supplied for the 4 GB handset contains `boot.img`, `dt.img` and `dtbo.img`; the base DTB extracted from `dt.img` carries the same three-bank declaration. This is direct stock/SOVR agreement, and the user's report establishes that the existing SOVR boot chain operates on the 4 GB handset with it. The DTB declaration must be preserved as part of the known-good boot contract.
 
-Action: keep the reference values out of the target DTS until captured from actual 4 GB and 6 GB devices (live FDT plus `/proc/iomem` and kernel memblock logs). In particular, ensure the 64-bit address cells, bank order, reserved-memory ranges and DMA limits are all checked together. This finding strengthens the requirement for shared SoC/board source plus bootloader-validated RAM discovery or SKU-specific memory-only variants.
+Important interpretation: the three DTB entries describe the declared physical address ranges, not a statement that the 4 GB handset has 6 GiB of installed or usable RAM. Do not infer usable capacity from the sum of DTB `reg` entries alone. Preserve the bank layout and let the same known-good SOVR/bootloader memory-discovery and reservation behaviour determine what Linux actually manages. During migration, compare the final flattened/live FDT, memblock logs, `/proc/iomem`, reserved-memory nodes and DMA limits against the working SOVR behaviour. Do not introduce a new memory filtering policy without evidence that it is required.
+
+### Multi-SKU rule
+
+For the 4 GB target, preserve the exact Samsung/SOVR three-bank declaration and boot flow. For 6 GB A50-family targets, use the same SOVR baseline unless verified stock firmware or live-device evidence demonstrates a genuine SKU-specific difference. Do not invent a different 6 GB map, and do not make RAM capacity alone a reason to fork the kernel or alter the shared SoC DTS. Both capacities remain release targets, but only the 4 GB handset has been confirmed by the user as running this exact SOVR arrangement.
+
+### Validation gate
+
+Before changing any memory-related property or memory initialization code, compare the Linux 5.1 result with the known-good SOVR kernel on the 4 GB handset: final FDT, memblock bank list, reserved-memory carveouts, CMA, secure/TEE and multimedia regions, DMA masks, and stress-test results. A mismatch must be explained before device testing. The 6 GB release target still requires a real 6 GB device or stock firmware evidence before claiming verified support.
