@@ -87,6 +87,10 @@ jobs:
           test -s out/a50-dtbo/exynos9610-universal9610-merged.dtb
           grep -q 'model =' out/a50-dtbo/exynos9610-universal9610-merged.dts
 
+      - name: Audit Exynos9610 vendor driver readiness
+        run: |
+          bash scripts/audit-exynos9610-vendor.sh exynos9610-vendor-audit.txt
+
       - name: Publish baseline build outputs
         uses: actions/upload-artifact@v4
         with:
@@ -98,3 +102,4 @@ jobs:
             arch/arm64/boot/dts/**/*.dtbo
             out/a50-dtbo/exynos9610-universal9610-merged.dtb
             exynos9610-smoke.config
+            exynos9610-vendor-audit.txt
