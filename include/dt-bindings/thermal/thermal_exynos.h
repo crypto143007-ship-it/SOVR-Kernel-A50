@@ -15,4 +15,9 @@
 #define TYPE_TWO_POINT_TRIMMING 3
 #define TYPE_NONE 4
 
+/* Exynos9610 TMU sensor types (from the vendor binding ABI). */
+#define TEM1002X			0x0
+#define TEM1455X			0x2
+#define TEM1456X			0x6
+
 #endif /* _EXYNOS_THERMAL_TMU_DT_H */
