@@ -6,3 +6,5 @@ dtb-$(CONFIG_ARCH_EXYNOS) += \
 	exynos9610.dtb
 
 # SOVR 4.2 A50 plugin DTBO is compiled separately with dtc -@ by the CI workflow.
+# Keep exported labels in the SoC DTB so the A50 plugin can resolve external fixups.
+DTC_FLAGS += -@
