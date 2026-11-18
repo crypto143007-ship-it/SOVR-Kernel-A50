@@ -50,36 +50,8 @@ jobs:
           scripts/config --enable SOC_EXYNOS9610
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- HOSTCFLAGS=-fcommon olddefconfig
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -s kernelversion
-          grep -q '^CONFIG_SOC_EXYNOS9610=y
-      - name: Build upstream ARM64 Image and DTBs
-        run: |
-          make -j2 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- HOSTCFLAGS=-fcommon Image dtbs
-
-      - name: Publish baseline build outputs
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-v5.1-arm64-upstream-baseline
-          if-no-files-found: error
-          path: |
-            arch/arm64/boot/Image
-            arch/arm64/boot/dts/**/*.dtb
-            .config
- .config
-          grep -q '^CONFIG_ARCH_EXYNOS=y
-      - name: Build upstream ARM64 Image and DTBs
-        run: |
-          make -j2 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- HOSTCFLAGS=-fcommon Image dtbs
-
-      - name: Publish baseline build outputs
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-v5.1-arm64-upstream-baseline
-          if-no-files-found: error
-          path: |
-            arch/arm64/boot/Image
-            arch/arm64/boot/dts/**/*.dtb
-            .config
- .config
+          grep -q '^CONFIG_SOC_EXYNOS9610=y$' .config
+          grep -q '^CONFIG_ARCH_EXYNOS=y$' .config
           grep -E '^(CONFIG_SOC_EXYNOS9610|CONFIG_ARCH_EXYNOS)=' .config
 
       - name: Build upstream ARM64 Image and DTBs
@@ -89,7 +61,7 @@ jobs:
       - name: Publish baseline build outputs
         uses: actions/upload-artifact@v4
         with:
-          name: linux-v5.1-arm64-upstream-baseline
+          name: linux-v5.1-exynos9610-kconfig-smoke
           if-no-files-found: error
           path: |
             arch/arm64/boot/Image
