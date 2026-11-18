@@ -185,3 +185,39 @@ The CPU/PSCI/GIC/timer observations are evidence for a candidate minimal DTS onl
 Added `.github/workflows/arm64-upstream-baseline.yml` on this integration branch. It runs on branch changes to kernel build/source paths and supports manual dispatch. The job installs an ARM64 cross-toolchain, generates the clean upstream ARM64 `defconfig`, builds `Image` and the upstream ARM64 DTB set, and publishes the build outputs plus `.config` as an Actions artifact.
 
 This is deliberately a **generic upstream Linux v5.1 baseline check**, not an Exynos9610/A50 kernel build: the current upstream tree still has no Exynos9610 DTS target or A50 defconfig. A green run will prove only that the pinned upstream baseline builds in CI; it will not prove A50 hardware support or bootability. The first workflow result remains pending verification.
+
+
+## Phase 13 — upstream ARM64 build artifact verified (2026-11-18)
+
+A successful GitHub Actions run was inspected, and its uploaded artifact was downloaded and examined locally.
+
+- Workflow run: https://github.com/crypto143007-ship-it/SOVR-Kernel-A50/actions/runs/44234009108
+- Run conclusion: `success`; all nine job steps completed successfully.
+- Build source: immutable upstream Linux v5.1 commit `e93c9c99a629c61837d5a7fc2120cd2b6c70dbdd`.
+- Configuration: upstream `defconfig`, with `CONFIG_ARCH_EXYNOS=y`.
+- Build targets: ARM64 `Image` and generic upstream `dtbs`.
+- Artifact: `linux-v5.1-upstream-arm64-baseline` (10,317,555 bytes; 14-day retention at upload).
+- Image: 20,492,800 bytes; SHA-256 `d0a9ed65f62228b40245728fe8e16ff7c4c00463b35ea3f3dcdc140a589542a6`.
+- Artifact contains 231 DTBs. Its Exynos outputs are only `exynos5433-tm2.dtb`, `exynos5433-tm2e.dtb`, and `exynos7-espresso.dtb`.
+
+### What this proves
+
+The pinned upstream Linux v5.1 tree can be configured and cross-compiled for generic ARM64 in the CI environment. The previous compiler-path and legacy host-DTC failures are resolved for this baseline job.
+
+### What this does not prove
+
+This artifact contains no Exynos9610 DTB and no A50 board DTB/DTBO. `CONFIG_ARCH_EXYNOS=y` is generic Exynos ARM64 support only. No Samsung Exynos9610 vendor CAL/CMUCAL/PMUCAL, clock-controller, ACPM, A50 board DTS, or device-specific defconfig was compiled. The generated Image is **not** an A50 boot image and must not be flashed.
+
+### Branch-state clarification
+
+The branch `linux-5.1-exynos9610-integration` remains a clean upstream Linux v5.1 integration workspace with audit/plan documents; it is not yet a vendor-integrated kernel. A direct compare against the pinned upstream base reports 14 commits ahead, 0 behind, and the listed changes are documentation/workflow additions. No executable Exynos9610 driver, DTS, Kconfig or Kbuild port has been committed yet.
+
+### Next implementation gate
+
+The next code patch must be deliberately small and reviewable:
+1. Add only the Exynos9610 SoC DTS source and its includes needed for parsing, based on the reference source but without copying unverified RAM/reserved-memory, firmware, or peripheral enablement.
+2. Add an isolated Exynos9610 DTB Makefile target only after the source's exact includes and compatible bindings are reconciled against the uploaded live A50 FDT and selected overlay.
+3. Compile the new DTB with upstream v5.1 DTC; inspect all warnings and decompile it for structural comparison.
+4. Keep the clock provider, CAL/PMUCAL and ACPM disabled until their source/API/Kconfig dependency closures are separately ported and built.
+
+The existing live-vs-SOVR DTB audit shows that memory/reserved-memory and overlay composition are not yet safe to reconstruct from the SOVR base DTB alone. Do not fabricate a minimal bootable A50 DTS from incomplete evidence.
