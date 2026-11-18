@@ -18,13 +18,18 @@ check_path() {
 check_path "generic UFS host" drivers/scsi/ufs/ufshcd.c
 check_path "platform UFS glue" drivers/scsi/ufs/ufshcd-pltfrm.c
 check_path "Samsung Exynos UFS host" drivers/scsi/ufs/ufs-exynos.c
+check_path "Exynos9610 UFS CAL" drivers/scsi/ufs/ufs-cal-9610.c
+check_path "Exynos UFS FMP" drivers/scsi/ufs/ufs-exynos-fmp.c
 check_path "EROFS staging source" drivers/staging/erofs
 check_path "EROFS mainline location" fs/erofs
 check_path "TZDEV" drivers/misc/tzdev
-check_path "Exynos CAL" drivers/soc/samsung/cal-if
-check_path "Exynos CMUCAL" drivers/soc/samsung/cal-if/cmucal
-check_path "Exynos PMUCAL" drivers/soc/samsung/cal-if/pmucal
-check_path "ACPM" drivers/soc/samsung/acpm
+check_path "Exynos CAL core" drivers/soc/samsung/cal-if/cal-if.c
+check_path "Exynos CMUCAL core" drivers/soc/samsung/cal-if/cmucal.c
+check_path "Exynos9610 CAL data" drivers/soc/samsung/cal-if/exynos9610/cal_data.c
+check_path "Exynos9610 CMUCAL nodes" drivers/soc/samsung/cal-if/exynos9610/cmucal-node.c
+check_path "Exynos9610 PMUCAL CPU" drivers/soc/samsung/cal-if/exynos9610/pmucal_cpu_exynos9610.h
+check_path "ACPM core" drivers/soc/samsung/acpm/acpm.c
+check_path "ACPM IPC" drivers/soc/samsung/acpm/acpm_ipc.c
 check_path "Samsung Mali platform" drivers/gpu/arm
 {
   echo
