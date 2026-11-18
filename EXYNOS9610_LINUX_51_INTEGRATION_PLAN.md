@@ -236,3 +236,35 @@ The integration branch's own workflow also completed successfully:
 This is a successful build of the clean upstream integration branch itself, not merely the separate assessment branch. The artifact still contains no A50-specific `.config`; the workflow builds generic upstream `defconfig`.
 
 **Current status remains: upstream ARM64 baseline green; Exynos9610 vendor integration not yet implemented.** No Image from either baseline artifact is suitable for A505F flashing.
+
+
+## Multi-SKU memory support policy — Galaxy A50 4 GB and 6 GB
+
+**Project target is the Galaxy A50 family, not only the 4 GB SM-A505F unit used for initial bring-up.** The port must retain support for both 4 GB and 6 GB RAM retail variants wherever the same Exynos9610 board/platform and boot chain are compatible.
+
+### Required design
+
+1. Keep one shared Exynos9610 SoC description and a shared A50 board base wherever hardware is common.
+2. Do not hardcode the 4 GB memory map into the common SoC DTS.
+3. Prefer the bootloader-provided, validated /memory node when the A50 boot chain supplies correct RAM banks. Verify this on representative 4 GB and 6 GB devices before relying on it.
+4. If a board DTB must declare RAM explicitly, provide clearly named SKU-specific board DT variants (4 GB and 6 GB) that differ only in verified memory-bank reg values and any genuinely SKU-specific reserved-memory carveouts. Do not create two unrelated kernels or duplicate the whole SoC DTS.
+5. Treat reserved-memory as independent of advertised RAM capacity: derive each carveout from the actual firmware/bootloader contract, ensure it lies wholly inside installed physical RAM where required, and check for overlap. Never scale or copy carveouts merely by adding 2 GB.
+6. At boot, validate the final memory map using /proc/iomem, kernel boot log (Memory: and reserved lines), memblock debug output when available, and Android userspace MemTotal. Confirm the 4 GB and 6 GB variants separately.
+7. Do not infer installed RAM solely from a product name, model suffix, or a userspace property. A wrong DT memory node can hide RAM or expose nonexistent memory and can cause memory corruption.
+8. Keep common kernel configuration and drivers identical across memory SKUs unless hardware evidence demonstrates a real board difference. RAM capacity alone must not require a separate kernel binary.
+
+### Validation matrix
+
+| Device class | Required validation |
+|---|---|
+| A50 4 GB | Correct bank sizes/base addresses; no out-of-range RAM; no carveout overlap |
+| A50 6 GB | Correct larger bank(s) as actually reported by bootloader; no truncation to 4 GB |
+| Both | UFS, CMA, secure/TEE, firmware and multimedia carveouts remain valid; stable cold boot and memory stress |
+
+### Current evidence and limitation
+
+The current bring-up handset is the 4 GB SM-A505F. Its memory map cannot be used to manufacture a 6 GB map. No 6 GB live FDT/DTB or /proc/iomem capture has yet been verified in this workspace. Therefore 6 GB support is an explicit release requirement, but the exact 6 GB bank layout remains unverified until evidence from a real 6 GB A50 variant is available.
+
+### Release gate
+
+Do not mark the A50 family port complete, publish it as supporting 6 GB, or ship a fixed-memory DTB until both 4 GB and 6 GB boot paths have passed memory-map and stress validation. If bootloader-supplied memory discovery is confirmed on both, prefer that shared path over hardcoded SKU-specific memory sizes.
