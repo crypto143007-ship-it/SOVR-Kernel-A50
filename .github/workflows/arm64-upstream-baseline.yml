@@ -57,6 +57,7 @@ jobs:
       - name: Build upstream ARM64 Image and DTBs
         run: |
           make -j2 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- HOSTCFLAGS=-fcommon Image dtbs
+          cp .config exynos9610-smoke.config
 
       - name: Publish baseline build outputs
         uses: actions/upload-artifact@v4
@@ -66,4 +67,4 @@ jobs:
           path: |
             arch/arm64/boot/Image
             arch/arm64/boot/dts/**/*.dtb
-            .config
+            exynos9610-smoke.config
