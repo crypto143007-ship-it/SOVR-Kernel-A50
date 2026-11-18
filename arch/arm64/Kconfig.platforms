@@ -65,6 +65,10 @@ config ARCH_BRCMSTB
 	help
 	  This enables support for Broadcom's ARMv8 Set Top Box SoCs
 
+config SOC_EXYNOS9610
+	bool "Samsung Exynos9610"
+	select ARCH_EXYNOS
+
 config ARCH_EXYNOS
 	bool "ARMv8 based Samsung Exynos SoC family"
 	select COMMON_CLK_SAMSUNG
