@@ -92,6 +92,31 @@ jobs:
           test -s out/a50-dtbo/exynos9610-universal9610-merged.dtb
           grep -q 'model =' out/a50-dtbo/exynos9610-universal9610-merged.dts
 
+      - name: Inventory A50 Exynos9610 Linux 5.15 reference sources
+        run: |
+          set -euo pipefail
+          git clone --depth=1 --branch exynos9610-port https://github.com/Vothcito/android_kernel_samsung_exynos9610_a50.git /tmp/vothcito-a50
+          report=exynos9610-reference-source-inventory.txt
+          : > "$report"
+          echo "Reference: Vothcito/android_kernel_samsung_exynos9610_a50" | tee -a "$report"
+          echo "Branch: exynos9610-port (Linux 5.15; source reference only, NOT Linux 5.1 compatible by assumption)" | tee -a "$report"
+          for path in \\
+            drivers/soc/samsung/cal-if/cal-if.c \\
+            drivers/soc/samsung/cal-if/cmucal.c \\
+            drivers/soc/samsung/cal-if/exynos9610/cal_data.c \\
+            drivers/soc/samsung/cal-if/exynos9610/cmucal-node.c \\
+            drivers/soc/samsung/cal-if/exynos9610/pmucal_cpu_exynos9610.h \\
+            drivers/soc/samsung/cal-if/pmucal_cpu.c \\
+            drivers/scsi/ufs/ufs-exynos.c; do
+            if test -f "/tmp/vothcito-a50/$path"; then
+              printf 'PRESENT  %s\\n' "$path" | tee -a "$report"
+            else
+              printf 'MISSING  %s\\n' "$path" | tee -a "$report"
+            fi
+          done
+          git -C /tmp/vothcito-a50 rev-parse HEAD | sed 's/^/Reference commit: /' | tee -a "$report"
+          echo "NOTE: inventory only; no vendor source copied or compiled in this step." | tee -a "$report"
+
       - name: Audit Exynos9610 vendor driver readiness
         run: |
           bash scripts/audit-exynos9610-vendor.sh exynos9610-vendor-audit.txt
@@ -109,3 +134,4 @@ jobs:
             out/a50-dtbo/*warnings.log
             exynos9610-smoke.config
             exynos9610-vendor-audit.txt
+            exynos9610-reference-source-inventory.txt
