@@ -326,3 +326,43 @@ Commit `93e50791b18f81a71209e592db411783a5773666` triggered Actions run `4425224
 2. Compare the resulting DTB's three memory banks and reserved-memory nodes against the Samsung stock DTB and working SOVR output.
 3. Add the A50 board/revision DTBO source set with stock revision mapping.
 4. Port the required Linux 5.1 drivers for pinctrl, SysMMU, PM domains, clocks/CAL, ACPM and board devices in dependency order.
+
+
+## Phase 14 — A50 DTB/DTBO CI and vendor-gap audit (2026-11-18)
+
+The latest integration-branch workflow completed successfully:
+
+- Run: https://github.com/crypto143007-ship-it/SOVR-Kernel-A50/actions/runs/44351760573
+- Run number: 25; commit: `0f3683000da19b252a0029b106de59645e143af8`.
+- All nine substantive job steps passed, including ARM64 Image/DTB compilation, Exynos9610 A50 overlay compilation, overlay application to the Exynos9610 base DTB, Vothcito source inventory, vendor readiness audit and artifact upload.
+- Artifact: `linux-v5.1-exynos9610-kconfig-smoke`, artifact ID `14449880694`, 10,388,201 bytes.
+
+### What the new CI actually validates
+
+- The in-tree Exynos9610 SoC DTB is included in the Linux v5.1 `dtbs` build.
+- The SOVR-derived `exynos9610-universal9610.dts` overlay preprocesses, compiles with symbols/fixups, and applies to the compiled Exynos9610 base DTB using `fdtoverlay`.
+- The merged FDT can be decompiled and contains a model property.
+- The build is reproducible in the current Ubuntu 22.04 ARM64 cross-build environment.
+
+### Warning debt — not resolved by the green exit status
+
+The overlay compile emitted 71 DTC warning lines; decompiling the merged DTB emitted 273 warning lines. CI currently records these logs but does not classify or fail on them. The successful overlay application proves syntactic/link compatibility with this base DTB, not correctness of every peripheral resource, interrupt, DMA reference or runtime driver.
+
+Next DT task: preserve both warning logs as review inputs, classify each warning by node/property, and fix only warnings whose correction is justified by the SOVR 4.2 / Samsung stock DT contract. Do not mass-delete nodes or suppress warnings to force a clean count.
+
+### Vendor source inventory and upstream gaps
+
+The pinned Vothcito reference branch `exynos9610-port` was cloned at commit `ace96fa34c0d8303a23c5518aae751a91274552b`. All seven specifically inventoried reference files exist there:
+
+- CAL core: `cal-if.c`, `cmucal.c`.
+- Exynos9610 CAL data and nodes: `cal_data.c`, `cmucal-node.c`.
+- PMUCAL CPU header and common implementation.
+- Samsung Exynos UFS host: `ufs-exynos.c`.
+
+The upstream v5.1 integration tree still lacks all seven corresponding vendor files. The vendor readiness audit also confirms that the Samsung Exynos UFS host, Exynos9610 UFS CAL, UFS FMP, TZDEV, CAL/CMUCAL, Exynos9610 CAL data, PMUCAL, ACPM core/IPC and Mali platform source are absent. Generic UFS host/platform glue and legacy EROFS staging source are present; the latter is not the same layout as the later mainline `fs/erofs` implementation.
+
+This is an inventory only. No Linux 5.15 vendor source was copied or compiled into v5.1 in this phase. Do not cherry-pick or copy these files wholesale: next inspect the CAL/CMUCAL dependency closure and compare its API, headers, Kconfig, Makefile and init ordering against v5.1 before importing a minimal buildable unit.
+
+### Scope and safety
+
+This remains an integration/build-validation artifact, not a bootable A505F release. No A50 Image/boot.img is produced or approved for flashing. Preserve the SOVR 4.2 three-bank memory declaration and the user's 4 GB + 6 GB family target; do not alter memory nodes based only on the arithmetic sum of DTB address ranges. The original upstream SOVR repository remains untouched.
