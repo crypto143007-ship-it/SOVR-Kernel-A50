@@ -131,3 +131,47 @@ Keep FLEXPMU out of the first port. The minimum CAL dependency sequence to valid
 Then verify the clock-provider and PM-domain callers that invoke this interface, their init ordering, and the DT/regmap resources they require. Do not claim this sequence is complete until all callers and initcall sites have been traced.
 
 This is static source inspection only; no compile or device test was run.
+
+
+## Follow-up audit — Exynos9610 clock-provider registration and DT contract
+
+Reference files inspected:
+- `drivers/clk/samsung/clk-exynos9610.c`
+- `include/soc/samsung/cal-if.h`
+- `drivers/soc/samsung/cal-if/cal-if.c`
+- `arch/arm64/boot/dts/exynos/exynos9610.dts`
+
+### Clock node contract
+
+The SoC DTS defines:
+
+```dts
+clock: clock-controller@0x12100000 {
+    compatible = "samsung,exynos9610-clock";
+    reg = <0x0 0x12100000 0x8000>;
+    #clock-cells = <1>;
+    acpm-ipc-channel = <0>;
+};
+```
+
+The driver binds this exact compatible with `CLK_OF_DECLARE(exynos9610_clk, "samsung,exynos9610-clock", exynos9610_clk_init)`. It maps resource index 0 using `of_iomap(np, 0)`, then calls `cal_if_init(np)`, and only after CAL succeeds allocates/registers the Samsung clock provider and all VCLK groups. It finally publishes the OF clock provider and assigns `late_time_init = exynos9610_vclk_init`.
+
+### Boot-critical behavior / migration risks
+
+1. **Hard panic on early failures:** missing node, failed `of_iomap`, failed CAL init, or provider allocation failure all invoke `panic()`. This is not graceful probe deferral. The port must preserve correct early-init ordering and required DT resources before enabling this driver.
+2. **CAL runs before CCF provider registration:** CAL initialization includes ECT parsing, VCLK initialization, SoC CAL data init, RAE, system PMUCAL, local PMUCAL and CPU PMUCAL initialization. The provider is registered only after that succeeds. Do not reorder these operations casually; trace all CAL dependencies and any clock API use before CCF publication.
+3. **Late VCLK setup:** after provider registration, the driver installs `late_time_init` to set AUD FM and CMGP I2C/USI rates. This is a vendor-specific late boot hook that must be checked against Linux 5.1 init sequencing and any existing platform `late_time_init` assignment.
+4. **DT resource assumption:** the driver assumes resource 0 is the required CMU mapping and uses the compatible as its sole match key. The node also supplies `acpm-ipc-channel = <0>`; its consumer and dependency must be traced before the A50 DT node is declared complete.
+5. **Provider breadth:** the driver registers numerous HWACG and special VCLK groups (APM, CAM, CMGP, TOP, CORE, DISP/AUD, FSYS, G2D/G3D, ISP, MFC, PERI, SHUB, USB, VIPX1/2). A first bootable port should not silently expose partially initialized IDs. Verify every referenced clock ID has a matching binding definition and backing CAL node/data before registration.
+
+### Linux 5.1 port gate
+
+Before enabling `CLK_OF_DECLARE` for A50:
+- Confirm the A505F DTB/DTBO actually presents the exact clock compatible and a compatible register range; the generic reference SoC DTS is not proof of the production A50 overlay.
+- Trace the ECT parser implementation and binary location/format expected by `ect_parse_binary_header()`.
+- Trace all `cal_if_init()` callers and the ACPM device/channel setup path.
+- Verify `late_time_init` is not already owned by another platform component and that the clock-setting calls are safe at that stage.
+- Confirm all VCLK/clock IDs, fixed external clocks, parent names, and clock binding indices agree with the target Linux 5.1 DT bindings.
+- Prefer a staged validation build with the provider disabled until CAL/ECT and all compile-time dependencies are satisfied; do not replace early panics with ignored errors that would hide a broken clock tree.
+
+No claim is made that the A50 DTB/DTBO contains this exact node. No compile or boot test was performed.
