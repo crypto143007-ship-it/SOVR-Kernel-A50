@@ -31,7 +31,11 @@ jobs:
       - name: Install cross-build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc bison flex libssl-dev libelf-dev             make python3 gcc-10-aarch64-linux-gnu binutils-aarch64-linux-gnu
+          sudo apt-get install -y bc bison flex libssl-dev libelf-dev make python3 gcc-10-aarch64-linux-gnu binutils-aarch64-linux-gnu
+          # Ubuntu's versioned cross-GCC package installs gcc-10 with a suffix.
+          # Kbuild expects the unversioned prefix executable.
+          sudo ln -sf /usr/bin/aarch64-linux-gnu-gcc-10 /usr/local/bin/aarch64-linux-gnu-gcc
+          aarch64-linux-gnu-gcc --version
 
       - name: Checkout immutable upstream Linux v5.1 commit
         uses: actions/checkout@v4
@@ -56,7 +60,9 @@ jobs:
       - name: Compile upstream ARM64 Image and DTBs
         working-directory: linux
         run: |
-          make -j2 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image dtbs
+          # Linux v5.1's bundled host dtc expects common-symbol semantics;
+          # modern GCC defaults to -fno-common and otherwise fails linking yylloc.
+          make -j2 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- HOSTCFLAGS=-fcommon Image dtbs
 
       - name: Upload upstream baseline evidence
         if: always()
