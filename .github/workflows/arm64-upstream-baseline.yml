@@ -100,20 +100,21 @@ jobs:
           : > "$report"
           echo "Reference: Vothcito/android_kernel_samsung_exynos9610_a50" | tee -a "$report"
           echo "Branch: exynos9610-port (Linux 5.15; source reference only, NOT Linux 5.1 compatible by assumption)" | tee -a "$report"
-          for path in \\
-            drivers/soc/samsung/cal-if/cal-if.c \\
-            drivers/soc/samsung/cal-if/cmucal.c \\
-            drivers/soc/samsung/cal-if/exynos9610/cal_data.c \\
-            drivers/soc/samsung/cal-if/exynos9610/cmucal-node.c \\
-            drivers/soc/samsung/cal-if/exynos9610/pmucal_cpu_exynos9610.h \\
-            drivers/soc/samsung/cal-if/pmucal_cpu.c \\
-            drivers/scsi/ufs/ufs-exynos.c; do
+          while IFS= read -r path; do
             if test -f "/tmp/vothcito-a50/$path"; then
-              printf 'PRESENT  %s\\n' "$path" | tee -a "$report"
+              printf 'PRESENT  %s\n' "$path" | tee -a "$report"
             else
-              printf 'MISSING  %s\\n' "$path" | tee -a "$report"
+              printf 'MISSING  %s\n' "$path" | tee -a "$report"
             fi
-          done
+          done <<'A50_PATHS'
+          drivers/soc/samsung/cal-if/cal-if.c
+          drivers/soc/samsung/cal-if/cmucal.c
+          drivers/soc/samsung/cal-if/exynos9610/cal_data.c
+          drivers/soc/samsung/cal-if/exynos9610/cmucal-node.c
+          drivers/soc/samsung/cal-if/exynos9610/pmucal_cpu_exynos9610.h
+          drivers/soc/samsung/cal-if/pmucal_cpu.c
+          drivers/scsi/ufs/ufs-exynos.c
+          A50_PATHS
           git -C /tmp/vothcito-a50 rev-parse HEAD | sed 's/^/Reference commit: /' | tee -a "$report"
           echo "NOTE: inventory only; no vendor source copied or compiled in this step." | tee -a "$report"
 
