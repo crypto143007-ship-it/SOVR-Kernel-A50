@@ -1,8 +1,8 @@
 # SOVR-Kernel-A50 Development State
 
 **Project baseline:** SOVR v4.2 / Linux 4.14.357 / Samsung Galaxy A50 SM-A505F / Exynos 9610  
-**Branch:** `main`  
-**Audited HEAD:** `b49265e31c3776fae7c661de4d1a36c17d35d551`
+**Branch:** `work/sovr42-explicit-lld`  
+**Audited HEAD:** `8a8cce0836c1088e5f61c0e0b685472ccc6e85fe`
 
 ## Done / Committed
 - `build.sh`: after sourcing the A50 device database, set `PLATFORM_VERSION="${BUILD_ANDROID_PLATFORM}.0.0"` so mkbootimg `--os_version` matches the selected `--android` target. The device DB's legacy static `12.0.0` no longer overrides Android 11/12/14 selection.
@@ -133,3 +133,12 @@
 - Revalidated SOVR fork main HEAD before this documentation update: `b49265e31c3776fae7c661de4d1a36c17d35d551`. `build.sh` still defaults to Neutron, does not verify exact 23.1.5, and does not explicitly select `LD=ld.lld` in the Neutron path. Existing workflows still lack Android 14 One UI KSU.
 - No kernel source, build script or workflow changed. No compile, ZIP package, or device boot test was run.
 - **Next:** run a disposable verification job against the kernel.org 23.1.5 archive: obtain Nathan Chancellor's kernel.org WKD key, record and pin its independently checked fingerprint, verify the uncompressed tar signature and signed SHA-256, inspect the extracted toolchain, assert exact Clang/LLD versions and host dependencies, then stage a dedicated branch patch that selects this pinned toolchain and passes `LD=ld.lld` explicitly. Add the Android 14 One UI KSU job only after this contract passes.
+
+
+## Work Branch Update — 2026-11-19
+- Created isolated branch `work/sovr42-explicit-lld` from main HEAD `7ed3f5ab8d0e2d35da0354e6079ecc93982d2d74`; main was not modified.
+- Updated only the Neutron/Clang build branch in `build.sh`: both defconfig and compile make invocations now pass `LD=ld.lld LLVM=1` explicitly, alongside the existing LLVM binutils. This makes linker selection explicit but does **not** prove the selected executable is LLD 23.1.5; exact binary validation remains required.
+- Change commit: `8a8cce0836c1088e5f61c0e0b685472ccc6e85fe`. Re-fetched the file: still 825 lines / 32,356 characters; confirmed both Neutron make invocations include the new flags. The existing `rui` path already explicitly used `LD=ld.lld`.
+- Additional packaging blocker found from recursive repository tree: `tools/make/package` contains only `files_aosp`, `files_fresh`, and `files_oneui`; there is no `files_oneui14` directory. In `build_package()`, One UI copies `files_oneui` for Android 11 and `files_fresh` only for Android 12 or 13. Android 14 copies neither set, so an A14 One UI ZIP would omit these variant-specific installer payloads. Do **not** silently assume the A12/13 Fresh payload is safe for One UI 14. Audit its init service, fstab and vendor assumptions, then add a deliberate A14 payload mapping only after compatibility review.
+- Build verification not run: this connector does not provide a shell/runner, and no CI run has been launched. No compiler, image, ZIP, or boot result is claimed.
+- Next: review `files_fresh/system/etc/init/init.fresh.perf.rc` and A14 One UI vendor/init/fstab expectations; separately verify toolchain provenance/version; then add a dedicated A14 KSU workflow on this branch. Keep main untouched pending tests and review.
