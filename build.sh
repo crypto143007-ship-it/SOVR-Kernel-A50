@@ -91,11 +91,11 @@ verify_toolchain() {
 		local LLD_VERSION_OUTPUT
 		CLANG_VERSION_OUTPUT=$(clang --version) || { script_echo "E: clang --version failed"; exit 1; }
 		LLD_VERSION_OUTPUT=$(ld.lld --version) || { script_echo "E: ld.lld --version failed"; exit 1; }
-		if [[ ! "${CLANG_VERSION_OUTPUT%%$'\n'*}" =~ ^clang[[:space:]]version[[:space:]]23\.1\.5([[:space:]]|$) ]]; then
+		if [[ ! "${CLANG_VERSION_OUTPUT%%$'\n'*}" =~ clang[[:space:]]version[[:space:]]23\.1\.5([[:space:]]|$) ]]; then
 			script_echo "E: Required Clang 23.1.5; found: ${CLANG_VERSION_OUTPUT%%$'\n'*}"
 			exit 1
 		fi
-		if [[ ! "${LLD_VERSION_OUTPUT%%$'\n'*}" =~ ^LLD[[:space:]]23\.1\.5([[:space:]]|$) ]]; then
+		if [[ ! "${LLD_VERSION_OUTPUT%%$'\n'*}" =~ LLD[[:space:]]23\.1\.5([[:space:]]|$) ]]; then
 			script_echo "E: Required LLD 23.1.5; found: ${LLD_VERSION_OUTPUT%%$'\n'*}"
 			exit 1
 		fi
