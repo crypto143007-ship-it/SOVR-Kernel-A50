@@ -388,3 +388,74 @@ Required decision for this Linux 5.1 port:
 5. No memory node is approved for a bootable Linux 5.1 image until all ranges are shown to be physically present, non-overlapping, and consistent with reserved/secure memory.
 
 This is a documentation correction only. It does not modify DTS, DTB, boot images, or memory configuration. No A50 Linux 5.1 bootability is claimed.
+
+
+## Phase 15 — verified A50 boot-chain, memory and Samsung DTBO contract (2026-11-19)
+
+This section supersedes the conflicting memory/DTBO interpretations in earlier entries. Evidence provenance is limited to one live SM-A505F 4 GB handset (EUX, SWA/OPEN, bootloader revision 6) plus the supplied stock and SOVR 4.2 binary images. It does not verify 6 GB or other regional/model variants.
+
+### Verified artifacts and boot-chain composition
+
+- The supplied stock ZIP contains `boot.img`, `dt.img`, and `dtbo.img`; it does not contain a separate `dtb.img`. The stock base-DTB table is `dt.img`.
+- The separately supplied live FDT is 219,477 bytes. The SOVR 4.2 `dtb.img` payload is 134,884 bytes; the stock `dt.img` FDT payload is 134,776 bytes. They are distinct trees.
+- The SOVR 4.2 flash package writes its base `dtb.img` to the `dtb` partition and does not package or flash a DTBO. S-Boot applies the existing Samsung stock `dtbo` partition.
+- The exact composition check used the SOVR 4.2 base payload plus each stock overlay entry via libfdt. Only stock overlay entry 5 (hardware revision range 0x6..0xFF) leaves the five S-Boot-added nodes, one S-Boot-deleted node, and four S-Boot-modified properties needed to match the live FDT. This is a verified binary comparison, not a DTS recompile.
+- The live tree matches the SOVR `oneui14` flavor. Its EROFS fstab and EMS nodes originate in the SOVR base tree, not in S-Boot.
+- Stock boot image is Android boot header v1 with no appended DTB, empty command lines, and no ramdisk. S-Boot supplies the effective live bootargs and applies the stock DTBO.
+
+### Correct interpretation of RAM
+
+The static stock and SOVR base DTBs both declare three 2-GiB banks at 0x80000000, 0x880000000 and 0x900000000. On the tested 4 GB handset, S-Boot rewrites this before Linux receives the live FDT:
+
+- It shrinks `memory@80000000` to 0x3AB00000 bytes.
+- It adds `memory@C0000000` (0x20000000 bytes) and `memory@E1900000` (0x1E700000 bytes).
+- It leaves `memory@880000000` unchanged at 2 GiB.
+- It deletes `memory@900000000`.
+- The resulting declared RAM total is 0xF9200000 bytes (3,986 MiB), with two holes in the low address window: 85 MiB at 0xBAB00000..0xC0000000 and 25 MiB at 0xE0000000..0xE1900000.
+
+Therefore neither prior blanket statement is correct on its own: the static three-bank declaration is present in the supplied working SOVR/stock base DTBs, but it is not the final Linux memory map on the tested 4 GB device. The live post-S-Boot FDT is the memory truth for that boot. Preserve the known base declaration unless a controlled boot-chain test proves it should change; do not copy the 4 GB live fragmented map into the shared SoC DTS and do not infer a 6 GB map from the static three-bank total.
+
+### Samsung stock DTBO selection contract
+
+The stock DTBO has six entries. All use table `id=0`, `rev=0`; selection is by the inclusive hardware-revision range mirrored between table `custom0/custom1` and overlay-root `dtbo-hw_rev/dtbo-hw_rev_end`:
+
+| Entry | Hardware revision range |
+|---|---|
+| 0 | 0x0..0x0 |
+| 1 | 0x1..0x1 |
+| 2 | 0x2..0x2 |
+| 3 | 0x3..0x3 |
+| 4 | 0x4..0x5 |
+| 5 | 0x6..0xFF |
+
+The tested handset reports revision 6 and DTBO index 5. These entries are SWA OPEN board overlays and contain no F/G/FN/GN/N or RAM-size selector. The repository's generic `id=/:board_id rev=/:board_rev` DTBO config is not equivalent to Samsung's scheme.
+
+**Design decision:** do not ship a replacement DTBO as part of this migration milestone. Keep the Samsung stock DTBO partition in place and retain a single base DTB table entry with `custom0=0`, `custom1=0xFF`, matching the existing SOVR 4.2 base-table convention. If source overlays are later needed for development, encode the Samsung hardware-revision properties/ranges exactly; do not substitute generic board_id/board_rev matching.
+
+### S-Boot reserved-memory and bootargs contract
+
+On the tested live FDT, S-Boot adds these reserved-memory nodes:
+
+- `el2_code`: 0x87000000, size 0x200000.
+- `el2_earlymem`: 0x8FE600000, size 0x1A00000.
+- `kaslr`: 0x80001000, size 0x1000.
+
+It also supplies bootargs-only carveouts/regions including `sec_avc_log=0x40000@0x91202000`, `sec_tsp_log=0x40000@0x91244000`, `sec_disp_log=0x100000@0x91286000`, `sec_debug_next=0x800000@0x91388000`, `ess_setup=0xf9000000`, `s3cfb.bootloaderfb=0xca000000`, plus `reserve-fimc` and `bcm_setup` values. The live bootargs also identify 4G DRAM and the selected hardware revision/DTBO index; device identifiers are deliberately excluded from this repository plan.
+
+The Linux 5.1 port must explicitly audit and reserve every applicable firmware-owned range before enabling affected allocators/drivers. Do not assume legacy vendor `sec_debug` early-parameter reservation code exists in upstream v5.1. Validate all ranges against the final live FDT, memblock output and `/proc/iomem`; do not duplicate reservations already made by firmware or another kernel subsystem. Keep raw live DTBs and identifying bootargs out of Git.
+
+### Verified versus open scope
+
+Verified from supplied blobs for one SM-A505F 4 GB handset: base/overlay composition, selected stock DTBO entry, post-S-Boot memory edits, the three added reserved-memory nodes, and the live SOVR One UI 14 tree identity. No Linux 5.1 kernel/DTB build or hardware boot is implied by these findings.
+
+Still open: actual 6 GB live memory map; stock/live evidence for SM-A505FN/G/GN/N and other regions; S-Boot behaviour when the static memory node layout is changed; and Linux 5.1 runtime reservation/boot behaviour. Keep all-family and 6 GB support as release goals, not verified claims.
+
+### DTS and clock integration follow-up
+
+The current Linux 5.1 branch already contains the SOVR-derived Exynos9610 SoC DTS, the imported binding header, and an A50 overlay compile/apply CI path. Its SoC DTS retains the three static memory banks and empty chosen bootargs/initrd placeholders; do not transplant live bootargs, live memory fragmentation, or S-Boot-added reserved-memory nodes into the common SoC DTS as if they were static source properties.
+
+The SoC DTS currently references `samsung,exynos9610-clock`, but the v5.1 clock provider implementation is not yet integrated. The reference Linux 5.15 clock driver depends on Samsung CAL interfaces and generated Exynos9610 CMUCAL VCLK/node/QCH and clockout headers, plus ACPM-mediated clock operations. It is not a self-contained file and must not be enabled by adding only one Makefile line. Next work must map and port the smallest CAL/CMUCAL API/data dependency closure to v5.1, then compile the clock provider behind a dedicated disabled-by-default Kconfig symbol. ACPM/firmware IPC must remain gated until its shared-memory ABI, error paths and initialization ordering are ported and reviewed.
+
+The live FDT reports a timer clock-frequency of 25.6 MHz (0x0186A000); the current imported SOVR DTS timer property must be checked against this verified live value before it is treated as final. Keep any correction evidence-scoped and record whether the value is a hardware input clock or merely a vendor timer property.
+
+**No bootability is claimed.** The next implementation gate is a clean v5.1 DTB build with warning classification, followed by separately compiled CAL/CMUCAL and clock-provider units. Never flash the generic upstream baseline or the current DTS-only artifacts to the handset.
