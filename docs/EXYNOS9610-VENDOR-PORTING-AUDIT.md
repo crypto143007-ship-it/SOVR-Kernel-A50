@@ -87,3 +87,33 @@ This is a source/API audit only; no pinctrl code was changed in this phase. The 
 ## Latest baseline CI observation (2026-11-19)
 
 Run `44459925266` for commit `12bee58939e07e0bf5736f55af7147c95ce41d5c` was still in progress at the time of inspection. Job `arm64-baseline` completed checkout, dependency installation and ARM64 defconfig; its upstream ARM64 Image/DTB build step was still running. DTBO diagnostic compile, vendor source inventory, readiness audit and artifact publication were pending, and no artifact had yet been published. Do not report this run as passed until GitHub records a completed successful conclusion.
+
+
+## Pinctrl audit correction — verified against current integration branch (2026-11-19)
+
+The earlier section titled “Exynos9610 pinctrl gap” is superseded by the current branch state and must not be treated as the present blocker.
+
+Direct inspection of the current Linux 5.1 integration branch confirms:
+
+- `drivers/pinctrl/samsung/pinctrl-exynos-arm64.c` now defines Exynos9610 pin-bank tables for ALIVE, CMGP, DISPAUD, FSYS, TOP and SHUB, plus `exynos9610_of_data`.
+- `drivers/pinctrl/samsung/pinctrl-samsung.c` contains the `samsung,exynos9610-pinctrl` OF match entry.
+- `drivers/pinctrl/samsung/Kconfig` selects `PINCTRL_EXYNOS_ARM64` for ARM64 + ARCH_EXYNOS.
+- The successful CI artifact for run `44459925266` contains `CONFIG_PINCTRL_EXYNOS_ARM64=y` and the Exynos9610 Image/DTB build completed.
+
+This closes the previously documented *source-presence and build-configuration* gap. It does not establish electrical correctness, interrupt/wakeup behavior, suspend/resume reliability, or successful pinctrl operation on physical SM-A505F hardware. Those remain runtime validation tasks.
+
+## CI artifact inspection — run 44459925266 (2026-11-19)
+
+The published artifact was downloaded and inspected, not inferred from the workflow log alone. It contains:
+
+- `arch/arm64/boot/Image` (20,492,800 bytes)
+- `arch/arm64/boot/dts/exynos/exynos9610.dtb` (128,154 bytes)
+- `arch/arm64/boot/dts/exynos/exynos9610-universal9610.dtbo` (80,355 bytes)
+- `out/a50-dtbo/exynos9610-universal9610-merged.dtb` (189,422 bytes)
+- `exynos9610-smoke.config` with `CONFIG_SOC_EXYNOS9610=y`, `CONFIG_ARCH_EXYNOS=y`, and `CONFIG_PINCTRL_EXYNOS_ARM64=y`.
+
+The base DTB string inventory contains the three expected memory node names `memory@80000000`, `memory@880000000`, and `memory@900000000`, and the Exynos9610 clock compatible. The overlay contains the A50 universal board model string and both `__fixups__` and `__symbols__`; CI successfully applied it to the base DTB with `fdtoverlay`.
+
+These checks prove the DTB and diagnostic overlay were compiled and merged. They do not prove that this overlay is a drop-in replacement for the stock DTBO partition, nor that the merged tree matches every stock bootloader/ROM revision. Continue to preserve the stock DTBO path until a byte-level/table-index and hardware compatibility audit is complete.
+
+The vendor readiness report still identifies major missing Linux 5.1 runtime pieces in the target tree: Samsung Exynos UFS host/FMP, Exynos CAL/CMUCAL/PMUCAL, ACPM, TZDEV and Samsung Mali platform integration. The successful CI run is therefore a platform-DTB and generic kernel build milestone, not a bootable daily-driver release.
