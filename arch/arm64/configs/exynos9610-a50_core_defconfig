@@ -5768,6 +5768,8 @@ CONFIG_IO_STRICT_DEVMEM=y
 CONFIG_INIT_STACK_ALL_ZERO=y
 
 # SuSFS (v1.5.5)
+# Use the manual reboot hook on the Linux 4.14 A50 kernel; Kprobes hook is not recommended below 5.10.
+CONFIG_KSU_MANUAL_HOOK=y
 CONFIG_KSU_SUSFS=y
 CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
 CONFIG_KSU_SUSFS_SUS_PATH=y
