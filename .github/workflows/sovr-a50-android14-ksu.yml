@@ -102,6 +102,9 @@ jobs:
           test -s tools/make/boot.img
           grep -q '^CONFIG_KSU=y$' .config
           grep -q '^CONFIG_KSU_SUSFS=y$' .config
+          grep -q '^CONFIG_KSU_MANUAL_HOOK=y$' .config
+          grep -q '^# CONFIG_KSU_KPROBES_HOOK is not set$' .config
+          grep -q '^CONFIG_LTO_CLANG=y$' .config
           grep -q '^CONFIG_THINLTO=y$' .config
           grep -q '^CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y$' .config
 
