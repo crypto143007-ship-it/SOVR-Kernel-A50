@@ -203,3 +203,13 @@
 - No Linux 5.1 integration-branch files were changed in this step.
 - The 6-GiB Exynos9610 base-DTB memory declaration versus the user's approximately 3.893-GiB live A50 memory map remains a P0 blocker on the Linux 5.1 integration branch. Do not package or flash that branch.
 - Next: inspect the new LLVM 23.1.5 CI run and logs; fix any toolchain, Kbuild, KSU, ThinLTO or packaging failure; verify artifact contents and manifest. Only after a clean build should the package be considered for controlled installation testing.
+
+
+## Final continuation checkpoint — 2026-11-19
+
+- Pinned the exact x86_64 LLVM 23.1.5 archive SHA-256 in the CI workflow in addition to verifying the signed kernel.org checksum manifest. Expected digest: `b69433120ad62420d789f601c58a5472873c724be088c99a70b72fd30ca4af3c`.
+- Corrected the CI package naming path so KernelSU builds are labelled `KSU`, not misleadingly `NoRoot`, for both mainline and beta CI package naming.
+- Re-fetched the final files from the branch. Current `build.sh`: 857 lines / 34,819 characters; exact LLVM gate present; both config and compile make invocations select LLD explicitly. New workflow: 150 lines; archive hash, signer fingerprint, ThinLTO, KSU manual-hook and package checks present. A50 defconfig retains O3 and ThinLTO and selects the 4.14-compatible KernelSU manual hook.
+- Last observed compare before this note: branch was 11 commits ahead and 0 behind main; four files changed: build script, A50 core defconfig, new Android 14 KSU workflow, and DEV_STATE. Main was not modified.
+- The commit combined-status endpoint returned no legacy status entries for the latest build-script commit. This is not proof of a successful or failed Actions run; no completed run conclusion or artifact has been inspected. No kernel compilation or boot success is claimed.
+- Next action: obtain the actual GitHub Actions run result for `SOVR 4.2 — Galaxy A50 Android 14 One UI KSU`, inspect logs and artifacts, and fix the first concrete failure. Do not merge to main, publish a release, or flash the ZIP until the build and package checks pass and a recovery-backed device test is completed.
