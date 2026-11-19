@@ -66,8 +66,8 @@ jobs:
           TOOLCHAIN_DIR="${CLANG_PATH%/bin/clang}"
           test -x "$TOOLCHAIN_DIR/ld.lld"
 
-          export PATH="$TOOLCHAIN_DIR:$PATH"
-          export LD_LIBRARY_PATH="$TOOLCHAIN_DIR/../lib:$TOOLCHAIN_DIR/../lib64:${LD_LIBRARY_PATH:-}"
+          export PATH="$TOOLCHAIN_DIR/bin:$PATH"
+          export LD_LIBRARY_PATH="$TOOLCHAIN_DIR/lib:$TOOLCHAIN_DIR/lib64:${LD_LIBRARY_PATH:-}"
           clang --version | tee clang-version.txt
           ld.lld --version | tee lld-version.txt
           grep -Eq '^clang version 23\.1\.5([[:space:]]|$)' clang-version.txt
@@ -75,8 +75,8 @@ jobs:
           clang --print-targets | grep -qi 'aarch64'
 
           echo "SOVR_LLVM_TOOLCHAIN_DIR=$TOOLCHAIN_DIR" >> "$GITHUB_ENV"
-          echo "$TOOLCHAIN_DIR" >> "$GITHUB_PATH"
-          echo "LD_LIBRARY_PATH=$TOOLCHAIN_DIR/../lib:$TOOLCHAIN_DIR/../lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          echo "$TOOLCHAIN_DIR/bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=$TOOLCHAIN_DIR/lib:$TOOLCHAIN_DIR/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
           cp checksum-signature.status checksum-signature.stderr llvm-23.1.5.sha256 clang-version.txt lld-version.txt "$GITHUB_WORKSPACE/"
 
       - name: Validate build script syntax and pinned toolchain
