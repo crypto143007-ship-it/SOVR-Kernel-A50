@@ -25,14 +25,14 @@
 - Do not assume the Neutron branch is a verified source of the documented LLVM 23.1.5 binaries without checking its exact revision and compiler version.
 
 ## Active Bug / Current Focus
-- **Toolchain provisioning/version mismatch — `build.sh:45-46,79-87,118-151`:** the script defaults to compiler selector `neutron` and requires `$HOME/toolchains/neutron-clang`. The Neutron special-case exits if absent before the generic repository-local fallback. LLVM upstream publishes an LLVM 23.1.5 release, but the exact ClangBuiltLinux-compatible distribution, archive checksum, extracted path and kernel-4.14 compatibility have not been verified. Do not pin or download a toolchain until these are confirmed.
+- **Toolchain target (user-confirmed and authoritative):** ClangBuiltLinux `clang 23.1.5` (`LLVM 23`) + `lld 23.1.5` + `ThinLTO`. This is the required SOVR 4.2 toolchain target; do not substitute Neutron rolling/latest LLVM, Clang 24, another LLVM release, GCC, or a different linker. **Provisioning remains to be verified:** `build.sh:45-46,79-87,118-151` currently selects `neutron` and expects `$HOME/toolchains/neutron-clang`; confirm the exact compatible distribution, compiler/linker versions, archive checksum, extracted path and kernel-4.14 compatibility before changing provisioning.
 - **Build failure propagation:** fixed in commit `00f81c0`; retain regression checks for pipeline failure propagation and stale Image prevention.
 - **CI coverage — `.github/workflows/development.yml`, `.github/workflows/galaxy-a50.yml`:** both cover Android 11/12 only and do not exercise the documented Android 14 KSU target. Existing jobs use Magisk or non-root invocations.
 - **Boot image patch metadata — `Documentation/device-db/a50.sh`:** `PLATFORM_PATCH_LEVEL` is static `2022-09`; determine the correct release policy before changing it.
 - Linux 5.1 migration remains unimplemented/unvalidated. Preserve the bootable Linux 4.14.357 SOVR 4.2 baseline.
 
 ## Next Step
-1. Verify the exact ClangBuiltLinux-compatible LLVM 23.1.5 distribution, checksum, extracted path and Linux 4.14 compatibility; then replace or repair the Neutron selector/provisioning.
+1. Provision and verify the user-confirmed ClangBuiltLinux `clang 23.1.5` / `lld 23.1.5` + ThinLTO toolchain (exact distribution, checksum, extracted path and Linux 4.14 compatibility); repair the Neutron selector/path only to deliver this exact target.
 2. Add a separate Android 14 One UI KSU CI job only after the toolchain is pinned and boot-image OS/patch metadata is validated.
 3. Run CI and inspect the generated config, Image, DTB/DTBO, ZIP contents and SHA-256 before any device flash.
 4. Audit the Android 14 One UI DTS selection and validate boot-image/DTB/DTBO packaging.
@@ -52,3 +52,10 @@
 3. Add a separate Android 14 One UI KSU CI job after toolchain and boot-image patch-level policy are validated.
 4. Run CI and inspect generated config, Image, DTB/DTBO, ZIP contents and SHA-256 before any device flash.
 5. Audit Android 14 One UI DTS selection and boot-image/DTB/DTBO packaging; then resume TZDEV/TEEGRIS compatibility and Linux 5.1 migration research without changing the bootable 4.14.357 baseline.
+
+
+## Toolchain Requirement Confirmation — 2026-11-19
+- User explicitly reconfirmed the required toolchain specification:
+  `ClangBuiltLinux clang 23.1.5 (LLVM 23) + lld 23.1.5 + ThinLTO`.
+- This is a **fixed project requirement**, not an open version-selection question. The README Technical Specifications table already states this exact row and remains aligned.
+- Distinguish the fixed target from the still-unverified acquisition/provisioning mechanism. The exact binaries/source revision, checksum and install path must be validated; do not reinterpret uncertainty about Neutron provisioning as uncertainty about the requested compiler version.
