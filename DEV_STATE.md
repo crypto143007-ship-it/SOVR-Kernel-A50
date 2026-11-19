@@ -2,7 +2,7 @@
 
 **Project baseline:** SOVR v4.2 / Linux 4.14.357 / Samsung Galaxy A50 SM-A505F / Exynos 9610  
 **Branch:** `work/sovr42-explicit-lld`  
-**Audited HEAD:** `8a8cce0836c1088e5f61c0e0b685472ccc6e85fe`
+**Audited HEAD:** `140fcdd9f182a24b9ede0ae4976149824b42ce17`
 
 ## Done / Committed
 - `build.sh`: after sourcing the A50 device database, set `PLATFORM_VERSION="${BUILD_ANDROID_PLATFORM}.0.0"` so mkbootimg `--os_version` matches the selected `--android` target. The device DB's legacy static `12.0.0` no longer overrides Android 11/12/14 selection.
@@ -156,3 +156,13 @@
 - LLVM 23.1.6 is now also listed, but the user's fixed project requirement remains Clang/LLD 23.1.5; do not silently upgrade.
 - No source code, kernel config, workflow, or toolchain files were changed in this continuation. No archive was downloaded or cryptographically verified; no compiler was executed; no kernel compile, ZIP package, CI run, or device boot test occurred.
 - **Next:** establish the PGP signer fingerprint for kernel.org's signed checksum file and/or archive signature, verify the 23.1.5 archive on a disposable runner, inspect its layout and runtime dependencies, then add a strict compiler+linker version gate and pinned provisioning on a dedicated branch. Only after that add the Android 14 One UI KSU enforcing CI job and inspect all build artifacts before flash.
+
+
+## Build Gate Update — 2026-11-19 (23:32 PKT)
+- Re-audited branch head before this change: `b68a83d4db59b62ea3f25eb89f9ea3b6a1fa38f5`; `main` remains the common ancestor and is not modified.
+- Updated `build.sh` on `work/sovr42-explicit-lld` to require both `clang --version` and `ld.lld --version` to match exactly 23.1.5 before continuing. The check is unconditional, so alternate `--toolchain` selections cannot bypass the SOVR toolchain contract. It fails closed when either executable is missing, exits unsuccessfully, or reports another version. Both version outputs are captured before matching; no version-output pipe is truncated with `head`.
+- Explicit `LD=ld.lld LLVM=1` remains in both Neutron defconfig and compile make invocations. The version gate now checks that the resolved PATH executables satisfy the documented Clang/LLD pair. It does not provision the compiler and does not itself validate ThinLTO code generation.
+- Build script update commit: `140fcdd9f182a24b9ede0ae4976149824b42ce17`; blob `eebb7eb044028996ed5660858b144cfadfb14a6c`; re-fetched file is 848 lines / 33,449 characters and the exact version gate is present. **Shell syntax and runtime tests have not been run** because no shell runner is available through the connected GitHub integration. Do not treat this as tested or compiled.
+- Corrected the earlier A14 packaging concern: `build_package()` copies no extra One UI payload for Android 14, but `tools/make/package/mint.sh` explicitly detects SDK 34/35/36 and selects “pure SOVR kernel defaults (EROFS system)” without copying `files_fresh` or `files_oneui`. Therefore the absence of an A14-specific payload directory is not by itself a packaging defect. Keep the Android 12/13 Fresh performance init script and One UI 3 fstab/RAM Plus payload out of A14 packages; their sysfs, cgroup and swap assumptions are not established for the target ROM.
+- The active build remains blocked until a trusted, exact ClangBuiltLinux 23.1.5 / LLD 23.1.5 toolchain is installed at the expected path. No toolchain archive was provisioned, no compiler executed, no CI workflow was dispatched, and no kernel Image/DTB/DTBO/ZIP was built or boot-tested.
+- **Next:** authenticate and provision the pinned LLVM 23.1.5 toolchain; then run `bash -n build.sh`, test the version gate with matching and mismatching mock executables, and execute the A50 Android 14 One UI KSU build. Validate generated config, Image, DTB/DTBO, ZIP file list and checksums before considering flash.
