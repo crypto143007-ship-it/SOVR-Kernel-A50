@@ -705,6 +705,11 @@ fi
 check_defconfig
 get_devicedb_info
 
+# Keep mkbootimg OS metadata aligned with the requested Android target.
+# The device DB provides boot-layout values; its legacy PLATFORM_VERSION must
+# not override the Android version selected with --android.
+PLATFORM_VERSION="${BUILD_ANDROID_PLATFORM}.0.0"
+
 # All variants get semi-Knox while we're fixing compile issues
 merge_config partial-deknox-${BUILD_ANDROID_PLATFORM}
 merge_config mali-${BUILD_ANDROID_PLATFORM}
