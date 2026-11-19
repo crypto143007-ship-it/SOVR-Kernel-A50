@@ -366,3 +366,25 @@ This is an inventory only. No Linux 5.15 vendor source was copied or compiled in
 ### Scope and safety
 
 This remains an integration/build-validation artifact, not a bootable A505F release. No A50 Image/boot.img is produced or approved for flashing. Preserve the SOVR 4.2 three-bank memory declaration and the user's 4 GB + 6 GB family target; do not alter memory nodes based only on the arithmetic sum of DTB address ranges. The original upstream SOVR repository remains untouched.
+
+
+## Safety correction — A50 live RAM map supersedes the three-bank carry-forward note (2026-11-19)
+
+This section supersedes the earlier Phase 13 wording that described the SOVR 4.2 three-bank declaration as a known-good declaration to preserve.
+
+The later uploaded live-device DTB versus SOVR 4.2 base-DTB audit found a material mismatch:
+
+- Live A50 DTB: four fragmented banks at 0x80000000 (size 0x3ab00000), 0xc0000000 (0x20000000), 0xe1900000 (0x1e700000), and 0x880000000 (0x80000000).
+- SOVR 4.2 base DTB: three banks at 0x80000000, 0x880000000, and 0x900000000, each declared as 2 GiB.
+- The SOVR base DTB therefore declares a 6 GiB address range and is not a safe memory-map source for the user's 4 GiB SM-A505F.
+- The live DTB's declared total is below nominal 4 GiB; reserved/secure carveouts and the final bootloader-selected DTBO must be reconciled before deriving usable RAM.
+
+Required decision for this Linux 5.1 port:
+
+1. Do not copy the SOVR 4.2 three-bank memory node into the A505F board DTS.
+2. Treat the uploaded live DTB as the current device evidence, but verify its memory and reserved-memory ranges against the bootloader-selected final FDT, `/proc/iomem`, and `MemTotal`.
+3. Obtain the matching SOVR 4.2 `dtbo.img` and determine which overlay is selected before drawing conclusions about SOVR's final board memory layout.
+4. Keep the 4 GB and 6 GB A50 variants as separate, explicitly validated board configurations if their physical memory maps differ. Never infer installed DRAM from a DTB's declared sum.
+5. No memory node is approved for a bootable Linux 5.1 image until all ranges are shown to be physically present, non-overlapping, and consistent with reserved/secure memory.
+
+This is a documentation correction only. It does not modify DTS, DTB, boot images, or memory configuration. No A50 Linux 5.1 bootability is claimed.
