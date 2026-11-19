@@ -14,12 +14,13 @@ check_path() {
   echo "Exynos9610 vendor integration audit"
   echo "Kernel: $(make -s kernelversion 2>/dev/null || echo unknown)"
   echo "Source presence is not proof of buildability or hardware functionality."
+  echo "UFS CAL/FMP integration must be traced from actual reference source paths; no guessed ufs-cal-9610.c path is assumed."
 } | tee -a "$report"
 check_path "generic UFS host" drivers/scsi/ufs/ufshcd.c
 check_path "platform UFS glue" drivers/scsi/ufs/ufshcd-pltfrm.c
 check_path "Samsung Exynos UFS host" drivers/scsi/ufs/ufs-exynos.c
-check_path "Exynos9610 UFS CAL" drivers/scsi/ufs/ufs-cal-9610.c
-check_path "Exynos UFS FMP" drivers/scsi/ufs/ufs-exynos-fmp.c
+check_path "Samsung Exynos UFS PHY" drivers/phy/samsung/phy-exynos7-ufs.c
+check_path "Samsung UFS PHY common" drivers/phy/samsung/phy-samsung-ufs.c
 check_path "EROFS staging source" drivers/staging/erofs
 check_path "EROFS mainline location" fs/erofs
 check_path "TZDEV" drivers/misc/tzdev
