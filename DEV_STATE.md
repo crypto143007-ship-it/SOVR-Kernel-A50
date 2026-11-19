@@ -245,3 +245,23 @@
 ### CI run 10 diagnosis
 - Run 10 (`a7e05af`) passed archive authentication, exact compiler/linker validation in the workflow, and `bash -n build.sh`; it then stopped inside `verify_toolchain()` because the script's own anchored Clang regex rejected the `ClangBuiltLinux` prefix. No make command ran.
 - That internal false-negative is corrected in commit `0effcad`; run 11 on that commit is the authoritative validation attempt. It was still queued/in progress at the last poll. Do not interpret run 10 as a kernel compile failure.
+
+
+## Build Continuation — 2026-11-19 (run 11 investigation)
+- Inspected GitHub Actions run 11 for commit `0effcad12ddc028ed452ac2ffa06c87e4ca7feaf`.
+- The pinned ClangBuiltLinux LLVM 23.1.5 archive authentication, checksum validation, compiler/linker version checks and `bash -n build.sh` all passed.
+- The Android 14 One UI KernelSU build step completed successfully: Kbuild reached `LD vmlinux` and `OBJCOPY arch/arm64/boot/Image`; mkbootimg reported Android OS version `14.0.0`; ZIP packaging completed and emitted `MintBeta-11.A14.OneUI6-Enforcing-KSU_A50.CI.zip`.
+- Overall run 11 failed in the subsequent artifact-validation step, not in the build step. Artifact upload was skipped, so no downloadable validation artifact was retained. The old validation script did not print which assertion failed; do not claim the generated config, boot image, ZIP or DTB has passed validation.
+- Build log contains repeated `LLVM ERROR: IO failure on output stream: Broken pipe` messages even though make returned success and reached vmlinux/Image. Treat these as an unresolved compiler/logging warning; inspect their origin and confirm output/object integrity in the next run.
+- CI package naming is currently branch-sensitive: the isolated branch generated a MintBeta filename although the workflow is titled SOVR 4.2. This is a packaging identity issue to resolve before treating the ZIP as a release candidate.
+- Commit `f6ab309e8cb0348d2226a08614e7f5be6d4b1e4b` updates only `.github/workflows/sovr-a50-android14-ksu.yml`: validation now records every individual PASS/FAIL, collects partial config/boot/ZIP diagnostics even after earlier failure, and attempts artifact upload with `if: always()`. This commit is on `build/llvm-23.1.5-enforcement`; `main` remains untouched.
+- The new workflow run triggered by `f6ab309` must be inspected for its per-check `artifacts/VALIDATION.txt`, generated config summary, package listing and SHA-256 files. Do not flash or merge based only on the successful build step.
+- No device boot test has been run. No Linux 5.1 migration changes were made.
+
+### Next steps
+1. Inspect the run triggered by `f6ab309` and identify the exact failed validation assertion from `artifacts/VALIDATION.txt`.
+2. Download/review the uploaded package, resolved config, boot image, DTB and checksums if the diagnostics run retains them; independently validate ZIP structure and boot-image metadata.
+3. Resolve the branch-sensitive MintBeta/SOVR filename/manifest mismatch without changing release behavior on `main`.
+4. Investigate repeated LLVM broken-pipe diagnostics and confirm whether they originate from toolchain output handling, ccache, or build subprocesses; require a clean log or documented benign cause.
+5. Audit whether DTBO is required for this A50 packaging path and whether the current installer/package includes the necessary DTB/DTBO assets.
+6. Only after these checks pass, consider merging the isolated Android 14 KSU workflow/build changes. Preserve SOVR 4.2 Linux 4.14.357 as the control baseline; resume Linux 5.1 migration separately.
