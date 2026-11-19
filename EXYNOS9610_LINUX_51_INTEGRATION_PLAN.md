@@ -578,3 +578,22 @@ Workflow commits:
 - 01b549f4a51e8f03dc7c11725037c076259be429 — publish the decompiled DTB and warning log.
 
 The validation run triggered for the updated workflow is pending at the time of this note. Check the branch's latest Actions run before reporting it as passed. No vendor clock source or runtime Kconfig enablement was added.
+
+
+## Phase 20 — pinctrl reference re-audit: EINT filter offset inconsistency (2026-11-19)
+
+A second, more targeted comparison was made after the prior Phase 16 summary. The exact Vothcito source blobs are:
+- `pinctrl-exynos-arm64.c`: `7fb319df272fd9155d00f8854dc1bf736d271ae1` (677 lines).
+- `pinctrl-exynos.h`: `c7c2d27415a2348f9c114c3e9894a0e2c0c83275` (229 lines).
+- `pinctrl-samsung.h`: `6922f8a69c70590ebbd0bc41e89cb40f8ee1fa1a` is the samsung.c blob? Verify file-specific SHA before relying on it; the actual fetched header content has `fltcon_offset` at the pin-bank-data structure.
+
+The Vothcito Exynos9610 tables use six controller groups and the EXYNOS9_PIN_BANK_EINTG/EINTW macros. Those macros populate both `eint_offset` and `fltcon_offset`. However, a search of the fetched reference `pinctrl-samsung.c` and `pinctrl-exynos.c` found no runtime read of `bank->fltcon_offset`; Exynos EINT filter save/restore still computes EFLTCON addresses using `2 * bank->eint_offset`. This is a source-level inconsistency that must be resolved against the actual Exynos9610 register map or a matching vendor implementation, not dismissed as a simple missing structure member.
+
+The Linux 5.1 target lacks the Exynos9610 bank tables, match entry and `fltcon_offset` members. The correct port is therefore not a mechanical cherry-pick. Before code import:
+1. Trace all EINT filter read/write paths and determine whether Exynos9610 filter offsets are linear in `eint_offset` or require the explicit table value.
+2. Compare the ALIVE wakeup controller and GPIO EINT controller register layouts and suspend/resume restore paths.
+3. Confirm resource indices for all six controller nodes against the DT reg/reg-names and the Samsung implementation.
+4. Only then extend the runtime structures and adapt all readers/writers consistently; otherwise omit the unused field and use proven offset calculations.
+5. Add compile-time and runtime-oriented tests that verify calculated register addresses for representative banks in each of ALIVE, CMGP, DISPAUD, FSYS, TOP and SHUB.
+
+No pinctrl implementation was copied or enabled in this phase. This finding blocks claiming the Exynos9610 pinctrl port is ready; CI's current green status only validates the upstream Image/DTB and diagnostic overlay build.
