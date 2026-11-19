@@ -97,34 +97,50 @@ jobs:
           ./build.sh --ksu --automated --device a50 --variant oneui --android 14 --toolchain llvm_23.1.5
 
       - name: Validate and collect build artifacts
+        if: always()
         shell: bash
         run: |
-          set -euo pipefail
-          ZIP_PATH="$(find . -maxdepth 1 -type f -name '*.zip' -print -quit)"
-          test -n "$ZIP_PATH"
-          test -s tools/make/boot.img
-          grep -q '^CONFIG_KSU=y$' .config
-          grep -q '^CONFIG_KSU_SUSFS=y$' .config
-          grep -q '^CONFIG_KSU_MANUAL_HOOK=y$' .config
-          grep -q '^# CONFIG_KSU_KPROBES_HOOK is not set$' .config
-          grep -q '^CONFIG_LTO_CLANG=y$' .config
-          grep -q '^CONFIG_THINLTO=y$' .config
-          grep -q '^CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y$' .config
-
+          set -uo pipefail
           mkdir -p artifacts
-          cp .config artifacts/kernel_config_a50_android14_oneui_ksu
-          cp tools/make/boot.img artifacts/boot.img
-          cp "$ZIP_PATH" artifacts/kernel-package.zip
-          unzip -p "$ZIP_PATH" Image > artifacts/Image
-          unzip -p "$ZIP_PATH" dtb.img > artifacts/dtb.img
-          unzip -Z1 "$ZIP_PATH" > artifacts/package-contents.txt
+          VALIDATION_STATUS=0
+          check() {
+            local label="$1"
+            shift
+            if "$@"; then
+              echo "PASS: $label" | tee -a artifacts/VALIDATION.txt
+            else
+              echo "FAIL: $label" | tee -a artifacts/VALIDATION.txt
+              VALIDATION_STATUS=1
+            fi
+          }
 
-          grep -Fxq 'Image' artifacts/package-contents.txt
-          grep -Fxq 'dtb.img' artifacts/package-contents.txt
-          grep -Fxq 'mint.sh' artifacts/package-contents.txt
-          grep -Fxq 'META-INF/com/google/android/update-binary' artifacts/package-contents.txt
-          test -s artifacts/Image
-          test -s artifacts/dtb.img
+          ZIP_PATH=""
+          while IFS= read -r candidate; do ZIP_PATH="$candidate"; break; done < <(find . -maxdepth 1 -type f -name '*.zip' -print | sort)
+          if [[ -s .config ]]; then
+            cp .config artifacts/kernel_config_a50_android14_oneui_ksu
+            grep -E '^(CONFIG_(KSU|KSU_SUSFS|KSU_MANUAL_HOOK|LTO_CLANG|THINLTO|CC_OPTIMIZE_FOR_PERFORMANCE_O3)=|# CONFIG_KSU_KPROBES_HOOK is not set)' .config > artifacts/config-feature-summary.txt || true
+          fi
+          [[ ! -s tools/make/boot.img ]] || cp tools/make/boot.img artifacts/boot.img
+          if [[ -n "$ZIP_PATH" ]]; then
+            cp "$ZIP_PATH" artifacts/kernel-package.zip
+            unzip -p "$ZIP_PATH" Image > artifacts/Image || true
+            unzip -p "$ZIP_PATH" dtb.img > artifacts/dtb.img || true
+            unzip -Z1 "$ZIP_PATH" > artifacts/package-contents.txt || true
+          fi
+
+          check "kernel ZIP exists" test -n "$ZIP_PATH"
+          check "mkbootimg output exists" test -s tools/make/boot.img
+          check "resolved KSU config" grep -q '^CONFIG_KSU=y$' .config
+          check "resolved SuSFS config" grep -q '^CONFIG_KSU_SUSFS=y$' .config
+          check "resolved KSU manual hook" grep -q '^CONFIG_KSU_MANUAL_HOOK=y$' .config
+          check "KSU kprobes hook disabled" grep -q '^# CONFIG_KSU_KPROBES_HOOK is not set$' .config
+          check "Clang LTO enabled" grep -q '^CONFIG_LTO_CLANG=y$' .config
+          check "ThinLTO enabled" grep -q '^CONFIG_THINLTO=y$' .config
+          check "O3 optimization enabled" grep -q '^CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y$' .config
+          check "packaged Image exists" test -s artifacts/Image
+          check "packaged DTB exists" test -s artifacts/dtb.img
+          check "installer script included" grep -Fxq 'mint.sh' artifacts/package-contents.txt
+          check "installer binary included" grep -Fxq 'META-INF/com/google/android/update-binary' artifacts/package-contents.txt
 
           {
             echo "Baseline: SOVR 4.2 / Linux 4.14.357"
@@ -134,15 +150,17 @@ jobs:
             echo "Toolchain: Clang 23.1.5 / LLD 23.1.5 / ThinLTO"
             echo "Boot image OS version: 14.0.0"
             echo "Device DB patch level: source-defined value retained; not independently verified in this job"
-            echo "Package source filename: $ZIP_PATH"
+            echo "Package source filename: ${ZIP_PATH:-missing}"
           } > artifacts/BUILD-MANIFEST.txt
-          sha256sum artifacts/* > artifacts/SHA256SUMS
+          if compgen -G 'artifacts/*' > /dev/null; then sha256sum artifacts/* > artifacts/SHA256SUMS; fi
+          exit "$VALIDATION_STATUS"
 
       - name: Upload A50 Android 14 KSU validation artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sovr42-a50-android14-oneui-ksu-llvm2315
-          if-no-files-found: error
+          if-no-files-found: warn
           path: |
             artifacts/**
             checksum-signature.status
