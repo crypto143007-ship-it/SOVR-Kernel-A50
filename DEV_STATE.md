@@ -281,3 +281,9 @@
 - Commits: `56d2081` (explicit SOVR branch override) and `437b432` (set empty override in dedicated A14 workflow). These changes trigger a fresh run; they do not alter `main`.
 - New package audit finding: `build_package()` only stages `files_oneui` for Android 11 and `files_fresh` for Android 12/13. For Android 14 it stages neither directory, even though One UI 14 DTS selection explicitly references Fresh 6 / One UI 6. This may omit required installer payload/config assets. Do not blindly copy both directories; inspect their contents and installer logic to establish the correct Android 14 payload before treating the ZIP as installable.
 - Next: inspect run 12's validation report/artifacts once complete; audit `mint.sh` and all files under `files_oneui` / `files_fresh` to identify required Android 14 installer payload; verify DTB/DTBO packaging and memory map; check run 13 built from the SOVR naming override. Keep branch isolated and do not flash.
+
+
+### Android 14 installer payload finding — resolved by source inspection
+- Inspected `tools/make/package/mint.sh`: for SDK 34/35/36 (One UI 6+ / Fresh 6), the installer explicitly selects "pure SOVR kernel defaults (EROFS system)" and does not copy any `files_oneui` or `files_fresh` assets. The Android 14 package staging omission is therefore intentional for this installer branch, not a missing-payload defect.
+- The `files_oneui` / `files_fresh` payloads are used for older One UI 3 and One UI 4/5 paths respectively. Do not add them to Android 14 without changing installer behavior and a demonstrated requirement.
+- The Android 14 package still must be checked for correct Image/DTB, AnyKernel scripts, boot metadata and safe target device handling.
