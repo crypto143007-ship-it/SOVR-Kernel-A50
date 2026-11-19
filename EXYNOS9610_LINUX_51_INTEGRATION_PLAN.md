@@ -557,3 +557,24 @@ The existing SoC DTS contains a node compatible with samsung,exynos9610-clock an
 - Keep the SoC clock node from causing an unconditional panic if a dependency is unavailable; runtime init policy must be reviewed before enabling the provider.
 
 No clock source was changed and no CAL/CMUCAL object build is claimed in this phase.
+
+
+## Phase 19 — explicit Exynos9610 DTB build assertions in CI (2026-11-19)
+
+The baseline workflow was strengthened so a green generic ARM64 build cannot silently pass without producing and checking the actual Exynos9610 SoC DTB.
+
+After the existing Image + dtbs build, CI now:
+- asserts the ARM64 Image exists;
+- asserts arch/arm64/boot/dts/exynos/exynos9610.dtb exists and is non-empty;
+- decompiles that exact DTB with the in-tree dtc;
+- asserts the three static SOVR/stock base memory nodes are present: memory@80000000, memory@880000000 and memory@900000000;
+- asserts the samsung,exynos9610-clock provider node compatible is present;
+- publishes the decompiled DTB source and its DTC warning log with the smoke-build artifact.
+
+This is a build-artifact integrity check only. It does not prove the clock provider exists in Linux 5.1, that pinctrl/clock consumers bind, that S-Boot produces the expected final FDT on another SKU, or that the kernel boots.
+
+Workflow commits:
+- f244e9ea2c052fe0e88ca46acda1b5248e6ada66 — add explicit Exynos9610 DTB and boot-contract assertions.
+- 01b549f4a51e8f03dc7c11725037c076259be429 — publish the decompiled DTB and warning log.
+
+The validation run triggered for the updated workflow is pending at the time of this note. Check the branch's latest Actions run before reporting it as passed. No vendor clock source or runtime Kconfig enablement was added.
