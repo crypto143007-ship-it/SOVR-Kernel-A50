@@ -24,6 +24,7 @@ on:
       - 'tools/**'
       - 'virt/**'
       - '.github/workflows/arm64-upstream-baseline.yml'
+      - 'docs/EXYNOS9610-VENDOR-PORTING-AUDIT.md'
   workflow_dispatch:
 
 permissions:
@@ -136,3 +137,4 @@ jobs:
             exynos9610-smoke.config
             exynos9610-vendor-audit.txt
             exynos9610-reference-source-inventory.txt
+            docs/EXYNOS9610-VENDOR-PORTING-AUDIT.md
