@@ -64,7 +64,7 @@ jobs:
           CLANG_PATH="$(find "$HOME/toolchains" -path '*/bin/clang' -print -quit)"
           test -n "$CLANG_PATH"
           TOOLCHAIN_DIR="${CLANG_PATH%/bin/clang}"
-          test -x "$TOOLCHAIN_DIR/ld.lld"
+          test -x "$TOOLCHAIN_DIR/bin/ld.lld"
 
           export PATH="$TOOLCHAIN_DIR/bin:$PATH"
           export LD_LIBRARY_PATH="$TOOLCHAIN_DIR/lib:$TOOLCHAIN_DIR/lib64:${LD_LIBRARY_PATH:-}"
@@ -102,7 +102,7 @@ jobs:
           test -s tools/make/boot.img
           grep -q '^CONFIG_KSU=y$' .config
           grep -q '^CONFIG_KSU_SUSFS=y$' .config
-          grep -q '^CONFIG_LTO_CLANG_THIN=y$' .config
+          grep -q '^CONFIG_THINLTO=y$' .config
           grep -q '^CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y$' .config
 
           mkdir -p artifacts
@@ -127,7 +127,7 @@ jobs:
             echo "Root: KernelSU + SuSFS"
             echo "Toolchain: Clang 23.1.5 / LLD 23.1.5 / ThinLTO"
             echo "Boot image OS version: 14.0.0"
-            echo "Device DB patch level: ${PLATFORM_PATCH_LEVEL:-read from build log; static source value not changed}"
+            echo "Device DB patch level: source-defined value retained; not independently verified in this job"
             echo "Package source filename: $ZIP_PATH"
           } > artifacts/BUILD-MANIFEST.txt
           sha256sum artifacts/* > artifacts/SHA256SUMS
