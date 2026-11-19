@@ -1,42 +1,36 @@
-# Exynos9610 CAL / clock integration dependency audit
+# Exynos9610 CAL / clock integration audit — SOVR 4.2 baseline
 
 Date: 2026-11-19
 Target: `linux-5.1-exynos9610-integration`
-Reference: `Vothcito/android_kernel_samsung_exynos9610_a50` (`exynos9610-port`)
+Primary reference: this repository's `main` branch (SOVR 4.2 baseline)
+Secondary reference: `Vothcito/android_kernel_samsung_exynos9610_a50`, branch `exynos9610-port`
 
-## Findings
+## Baseline correction
 
-The reference provides `drivers/clk/samsung/clk-exynos9610.c` (28,338 bytes), but the target branch does not yet contain it. It is not a standalone clock driver: it includes the Samsung CAL interface and Exynos9610-generated CMUCAL headers.
+Use the SOVR 4.2 source on this repository's `main` branch as the primary implementation reference. The Vothcito tree is a supplementary Exynos9610 source reference only; it must not override SOVR 4.2 behavior, boot packaging, DTB/DTBO handling, or memory initialization.
 
-Confirmed reference files missing from target:
+Confirmed SOVR 4.2 reference files on `main`:
 
-- `include/soc/samsung/cal-if.h`
-- `drivers/soc/samsung/exynos9610/cmucal-vclk.h`
-- `drivers/soc/samsung/exynos9610/cmucal-node.h`
-- `drivers/soc/samsung/exynos9610/cmucal-qch.h`
-- `drivers/soc/samsung/exynos9610/clkout_exynos9610.h`
-- `drivers/soc/samsung/exynos9610/cal_data.c`
-- CAL implementation and generated Exynos9610 tables under `drivers/soc/samsung/cal-if/`
+- `drivers/clk/samsung/clk-exynos9610.c` — blob `1ecdd4ea5b66601c2a68a1d8eefaf992505b2061`
+- `drivers/soc/samsung/cal-if/Makefile` — blob `00944ace1b772acd0193edf80792dd7b884e4c0a`
+- `drivers/soc/samsung/Kconfig` — blob `1d2a3a8baa33a94d125eb912835452c84c43ed59`
+- `include/soc/samsung/cal-if.h` — blob `65fe05a30e4251b0ca9d735ddbb29d7713374ac5`
+- `drivers/pinctrl/samsung/pinctrl-exynos-arm64.c` — blob `85a30b5fe024506b8bb6d6f28145a8943fd1b0c8`
+- `drivers/pinctrl/samsung/pinctrl-samsung.c` — blob `aa361d951ab9fe051eea504f45476d023a12d90d`
 
-The Exynos9610 clock binding header `include/dt-bindings/clock/exynos9610.h` already exists in the target and matches the reference blob SHA `87f9b98cd72a3217fe5137f38ff9d4046834dc25`.
+SOVR 4.2 places generated Exynos9610 CAL data under `drivers/soc/samsung/cal-if/exynos9610/`, not `drivers/soc/samsung/exynos9610/`. That directory contains `cal_data.c`, CMUCAL node/QCH/VCLK/SFR/VCLK LUT sources and headers, clock-output definitions, and Exynos9610 PMUCAL tables. Shared CAL implementation is under `drivers/soc/samsung/cal-if/`.
 
-The target clock Kconfig and Makefile are older/smaller than the reference. They need a controlled Kconfig/Makefile integration after the CAL dependency tree is ported. Do not add `clk-exynos9610.o` alone: it will fail to compile or link without CAL and CMUCAL.
+## Integration rules
 
-## Pinctrl validation caveat
+1. Diff the target Linux 5.1 files against SOVR 4.2 `main` first; port only the compatible changes, preserving Linux 5.1 APIs.
+2. Bring CAL shared sources and generated Exynos9610 data as a dependency-complete set. Do not copy only `clk-exynos9610.c`.
+3. Keep SOVR 4.2's CAL Kconfig and Makefile relationships; adapt symbols to the target tree rather than introducing duplicate or conflicting configs.
+4. Port the SOVR 4.2 clock provider and its binding only after CAL/CMUCAL dependencies compile.
+5. Keep DTS clock names/IDs unchanged unless the A50 device tree proves a required correction.
+6. Keep the SOVR 4.2 boot flow, stock DTBO, and single shared kernel/DTB memory approach unchanged for 4 GB and 6 GB models.
 
-The imported Exynos9610 bank tables include `fltcon_offset` metadata, but the target runtime `struct samsung_pin_bank` and Samsung bank-data copy path do not carry that field, and the reference runtime driver also continues to calculate EFLTCON addresses from `eint_offset`. Do not claim that the independent filter offset is currently consumed by runtime code. Keep this metadata as reference compatibility only until the Exynos9610 register map proves whether a separate runtime field is needed.
+## Verification caveats
 
-The target pinctrl match is under `CONFIG_PINCTRL_EXYNOS_ARM64`; that symbol is selected by the existing `PINCTRL_EXYNOS` ARM64/ARCH_EXYNOS dependency. No separate build-system object entry is required for the existing `pinctrl-exynos-arm64.o`.
+The SOVR 4.2 reference pinctrl file contains the six Exynos9610 controller groups. The integration branch has corresponding earlier commits, but those changes have not yet been validated by a real kernel build. The `fltcon_offset` metadata must not be treated as runtime functionality unless the bank runtime path actually consumes it.
 
-## Next safe implementation sequence
-
-1. Port `cal-if.h` and its required public types/APIs, after checking Linux 5.1 include/API compatibility.
-2. Port the minimum shared CAL implementation and the Exynos9610 CMUCAL generated data as a coherent set; preserve source license headers and generated-file provenance.
-3. Audit all includes and symbols referenced by `clk-exynos9610.c`; do not omit dependencies simply to make the file appear present.
-4. Add the SoC CAL Kconfig/Makefile wiring and the clock Kconfig/Makefile entry together.
-5. Compile the CAL objects and Exynos9610 clock provider with the A50 defconfig before enabling the provider in DTS.
-6. Validate clock IDs and provider names against the existing A50 DTS; do not change clock assignments without matching hardware evidence.
-
-## Status
-
-This is a dependency audit only. No CAL or clock driver has been copied or enabled and no kernel build is claimed. The SOVR 4.2 boot/DTB/stock-DTBO contract and one-kernel/one-DTB 4 GB/6 GB compatibility requirement remain unchanged.
+No CAL/clock source copy or build is claimed by this audit. Compile and link checks remain mandatory before any provider is enabled or any boot image is packaged.
