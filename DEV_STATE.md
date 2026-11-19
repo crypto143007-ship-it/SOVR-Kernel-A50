@@ -241,3 +241,7 @@
 - Commit: `0effcad12ddc028ed452ac2ffa06c87e4ca7feaf` (`build: accept ClangBuiltLinux version prefixes`). The change triggers another isolated-branch CI run.
 - Workflow matcher correction is in `a7e05af`; this second correction is necessary or the build would still stop before make.
 - No kernel compilation or package has yet been produced. Main remains unchanged. Await the new CI run and inspect every stage, especially Kconfig resolution, KernelSU manual-hook selection, ThinLTO and package/DTB output.
+
+### CI run 10 diagnosis
+- Run 10 (`a7e05af`) passed archive authentication, exact compiler/linker validation in the workflow, and `bash -n build.sh`; it then stopped inside `verify_toolchain()` because the script's own anchored Clang regex rejected the `ClangBuiltLinux` prefix. No make command ran.
+- That internal false-negative is corrected in commit `0effcad`; run 11 on that commit is the authoritative validation attempt. It was still queued/in progress at the last poll. Do not interpret run 10 as a kernel compile failure.
