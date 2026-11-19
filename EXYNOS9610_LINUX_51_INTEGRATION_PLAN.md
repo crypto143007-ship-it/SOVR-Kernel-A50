@@ -368,27 +368,11 @@ This is an inventory only. No Linux 5.15 vendor source was copied or compiled in
 This remains an integration/build-validation artifact, not a bootable A505F release. No A50 Image/boot.img is produced or approved for flashing. Preserve the SOVR 4.2 three-bank memory declaration and the user's 4 GB + 6 GB family target; do not alter memory nodes based only on the arithmetic sum of DTB address ranges. The original upstream SOVR repository remains untouched.
 
 
-## Safety correction — A50 live RAM map supersedes the three-bank carry-forward note (2026-11-19)
+## Historical safety correction — superseded by Phase 15
 
-This section supersedes the earlier Phase 13 wording that described the SOVR 4.2 three-bank declaration as a known-good declaration to preserve.
+The following earlier conclusion was based on comparing the live FDT directly with the SOVR base DTB before the selected stock overlay and S-Boot transformations were reconstructed. It is retained as audit history only and is **superseded by the verified binary composition in Phase 15**. Do not use its recommendation to discard the static three-bank base declaration or to seek a non-existent SOVR DTBO.
 
-The later uploaded live-device DTB versus SOVR 4.2 base-DTB audit found a material mismatch:
-
-- Live A50 DTB: four fragmented banks at 0x80000000 (size 0x3ab00000), 0xc0000000 (0x20000000), 0xe1900000 (0x1e700000), and 0x880000000 (0x80000000).
-- SOVR 4.2 base DTB: three banks at 0x80000000, 0x880000000, and 0x900000000, each declared as 2 GiB.
-- The SOVR base DTB therefore declares a 6 GiB address range and is not a safe memory-map source for the user's 4 GiB SM-A505F.
-- The live DTB's declared total is below nominal 4 GiB; reserved/secure carveouts and the final bootloader-selected DTBO must be reconciled before deriving usable RAM.
-
-Required decision for this Linux 5.1 port:
-
-1. Do not copy the SOVR 4.2 three-bank memory node into the A505F board DTS.
-2. Treat the uploaded live DTB as the current device evidence, but verify its memory and reserved-memory ranges against the bootloader-selected final FDT, `/proc/iomem`, and `MemTotal`.
-3. Obtain the matching SOVR 4.2 `dtbo.img` and determine which overlay is selected before drawing conclusions about SOVR's final board memory layout.
-4. Keep the 4 GB and 6 GB A50 variants as separate, explicitly validated board configurations if their physical memory maps differ. Never infer installed DRAM from a DTB's declared sum.
-5. No memory node is approved for a bootable Linux 5.1 image until all ranges are shown to be physically present, non-overlapping, and consistent with reserved/secure memory.
-
-This is a documentation correction only. It does not modify DTS, DTB, boot images, or memory configuration. No A50 Linux 5.1 bootability is claimed.
-
+The verified result is: stock and SOVR 4.2 static base DTBs both declare three 2-GiB banks; stock Samsung DTBO entry 5 is applied on the tested revision-6 SM-A505F; S-Boot then edits the memory nodes before Linux receives the live FDT. The live post-S-Boot FDT, not the static base table, is the memory map Linux must validate at runtime. Phase 15 is authoritative for this one-device evidence and its limitations.
 
 ## Phase 15 — verified A50 boot-chain, memory and Samsung DTBO contract (2026-11-19)
 
@@ -474,4 +458,51 @@ Next pinctrl implementation gate: audit and adapt the v5.1 bank initialization, 
 
 The full handoff's stock boot/DTB/DTBO contract is recorded in Phase 15: stock `boot.img` is header v1 with no ramdisk or appended DTB; stock base table is `dt.img`; SOVR 4.2 writes only its base `dtb.img` to the dtb partition and leaves the Samsung stock `dtbo` partition untouched. The stock overlay selection is by the six inclusive hardware-revision ranges mirrored in table `custom0/custom1` and overlay root `dtbo-hw_rev/dtbo-hw_rev_end`, not generic `board_id/board_rev`. The live evidence remains limited to one SM-A505F 4 GB EUX/SWA OPEN revision-6 handset.
 
-Latest run `44459925266` at commit `12bee58939e07e0bf5736f55af7147c95ce41d5c` was still in progress at last inspection: checkout, dependency install and ARM64 defconfig passed; the upstream Image/DTB step was running; DTBO diagnostic compile, source inventory, readiness audit and artifact upload were pending. No artifact was available at that inspection. This is not a completed build result.
+The stale run-status snapshot above is superseded by Phase 17: run 44460482796 completed successfully for commit d85c6a71b401e8a32d177acf6edb45e5ebc357e5, including ARM64 Image/DTB build, diagnostic overlay compile/apply, reference source inventory, readiness audit and artifact publication. Its artifact is a smoke-build bundle, not a bootable A50 kernel.
+
+
+## Phase 17 — uploaded handoff reconciliation and latest CI result (2026-11-19)
+
+The user supplied a verified handoff containing the stock boot.img, dt.img, dtbo.img, separately supplied A50_live.dtb, and SOVR 4.2 dtb.img provenance. This phase records the conclusions that supersede earlier ambiguous notes.
+
+### Authoritative handoff corrections
+
+1. The stock ZIP contains boot.img, dt.img, and dtbo.img; the stock base DTB table is dt.img, not a separate stock dtb.img.
+2. The stock boot image is Android boot header v1, has no ramdisk, no appended DTB and empty command lines. S-Boot supplies the effective live bootargs and applies the stock DTBO.
+3. SOVR 4.2 packages one base dtb.img and its AnyKernel installer writes that image to the dtb partition. It does not package or flash a DTBO. The existing Samsung stock dtbo partition remains in use.
+4. The SOVR 4.2 base FDT and stock dt.img FDT are different payloads (134,884 B versus 134,776 B). The live tree matches the SOVR oneui14 flavor.
+5. The stock DTBO selection is by inclusive hardware-revision ranges, mirrored in table custom0/custom1 and overlay root dtbo-hw_rev/dtbo-hw_rev_end, with id=0, rev=0: entry 0 [0,0], 1 [1,1], 2 [2,2], 3 [3,3], 4 [4,5], 5 [6,0xFF]. The tested revision-6 handset selects entry 5. There is no variant/RAM selector in the supplied SWA OPEN overlays.
+6. Exact libfdt overlay composition proves SOVR 4.2 base + stock overlay entry 5 leaves only S-Boot's edits when compared with the supplied live FDT. This is verified from blobs for one SM-A505F 4 GB EUX/SWA OPEN revision-6 device only.
+7. Both static base DTBs declare three 2-GiB banks at 0x80000000, 0x880000000, and 0x900000000. On the tested 4 GB device S-Boot shrinks the first bank to 0x3AB00000, adds 0xC0000000 size 0x20000000 and 0xE1900000 size 0x1E700000, retains the 0x880000000 bank, and deletes 0x900000000. Do not replace the shared static declaration with the live fragmented map. Do not infer 6 GB support from the static sum.
+8. S-Boot adds reserved-memory nodes el2_code, el2_earlymem, and kaslr, and supplies bootargs-only secure/debug/framebuffer carveout arguments. The Linux 5.1 port must audit ownership and reserve applicable firmware ranges exactly once before enabling affected allocators/drivers; do not blindly duplicate firmware or kernel reservations.
+9. The repository's generic board_id/board_rev DTBO scheme is not Samsung's stock hardware-revision scheme. Do not ship a replacement DTBO in this migration milestone. Preserve the one-entry base DTB table convention custom0=0, custom1=0xFF, and leave the stock DTBO partition untouched.
+10. The handoff's §8 correction is applied here: earlier contradictory three-bank statements are reconciled by the static-base/S-Boot-final distinction; the request for a matching SOVR 4.2 DTBO is removed because none is shipped; Samsung's revision ranges are recorded; stock and SOVR base payloads are distinguished; S-Boot memory/reservation behaviour is an explicit Linux 5.1 contract. The 6 GB and non-F model/region claims remain unverified.
+
+### Current target-tree state
+
+- Branch: linux-5.1-exynos9610-integration.
+- Current tip at this update: d85c6a71b401e8a32d177acf6edb45e5ebc357e5.
+- The SOVR-derived Exynos9610 SoC DTS, supporting .dtsi files and binding headers are present; the SoC DTS retains the three static memory banks and empty chosen bootargs/initrd placeholders.
+- The Exynos9610 DTB is included in the upstream v5.1 dtbs build via arch/arm64/boot/dts/exynos/Makefile.
+- The CI diagnostic exynos9610-universal9610.dts overlay uses a generic board-id/revision scheme. It is not Samsung's stock DTBO table and is not part of the SOVR flash package. Treat it strictly as a syntax/link smoke test.
+- The Linux 5.1 clock provider implementation and its CAL/CMUCAL/ACPM dependencies remain unported. Pinctrl runtime data also remains incomplete as documented in Phase 16. A successful DTB compile does not prove these devices bind or operate.
+
+### Latest CI result
+
+- Run: https://github.com/crypto143007-ship-it/SOVR-Kernel-A50/actions/runs/44460482796
+- Commit: d85c6a71b401e8a32d177acf6edb45e5ebc357e5.
+- Conclusion: success; all job steps completed.
+- Artifact: linux-v5.1-exynos9610-kconfig-smoke, artifact ID 14500356553, size 10,391,298 bytes.
+- The run compiled upstream ARM64 Image and DTBs, compiled/applied the diagnostic UNIVERSAL9610 overlay, inventoried Vothcito Linux 5.15 reference files, ran the vendor readiness audit and published artifacts.
+- It did not compile the vendor CAL/CMUCAL/ACPM or clock provider, did not build a Samsung stock-compatible DTBO, and did not produce a bootable A50 package. No hardware boot is claimed.
+
+### Next safe implementation order
+
+1. Keep the stock/SOVR static memory declaration and stock DTBO contract unchanged. Do not copy the live FDT's S-Boot modifications into the common DTS.
+2. Classify the existing 71 overlay compiler warnings and 273 merged-DTB decompile warnings by node/property; only fix evidence-supported issues.
+3. Finish the Linux 5.1 pinctrl API/data adaptation, including EINT filter offsets and wake/suspend paths, before enabling its six controller nodes.
+4. Map the minimum CAL/CMUCAL dependency closure against the exact Vothcito reference commit and upstream v5.1 APIs; port isolated objects first.
+5. Port the Exynos9610 clock provider behind a disabled-by-default Kconfig symbol only after its CAL/CMUCAL dependencies compile. Keep ACPM/firmware IPC disabled until ABI and initialization ordering are verified.
+6. Audit S-Boot secure/debug/framebuffer reservations against v5.1 memblock and existing reserved-memory handling; reserve each range once.
+7. Only then expand to SysMMU, UFS and remaining board peripherals. The 6 GB and non-F variant support remains a release target, not a verified result.
+
