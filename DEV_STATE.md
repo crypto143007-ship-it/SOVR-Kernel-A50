@@ -217,3 +217,10 @@
 
 ### Branch count correction
 - Final post-check compare: this branch is **14 commits ahead, 0 behind** main; the same four files are changed. The earlier 11-ahead figure above was from the preceding checkpoint, before the last three documentation/workflow commits.
+
+
+### Default compiler selection correction
+- Changed the build script's default toolchain selector and the `--toolchain` omitted-value fallback to `llvm_23.1.5`. Ordinary builds on this branch now select the pinned compiler without requiring an extra CLI argument.
+- The dedicated LLVM 23.1.5 path fails closed if its binaries are absent or either version is wrong; it does not auto-download or fall back to Neutron. Other legacy selectors remain explicit opt-ins, not defaults.
+- Latest compare after this change: 16 commits ahead, 0 behind main; changed files remain .github/workflows/sovr-a50-android14-ksu.yml, DEV_STATE.md, arch/arm64/configs/exynos9610-a50_core_defconfig, build.sh. Main remains unchanged.
+- CI has not yet produced an observable completed result or artifact in this session. The next engineering step remains reviewing the actual Actions run.
