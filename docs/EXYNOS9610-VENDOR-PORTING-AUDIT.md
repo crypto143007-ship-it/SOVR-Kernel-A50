@@ -146,3 +146,16 @@ This is a path-level absence check, not a complete repository-wide symbol search
 ### CI status wording correction
 
 Do not describe run `44459925266` as successful solely from a downloaded artifact or a prior assistant summary. The branch audit previously recorded it as in progress, and the recorded observations conflict. Query the workflow run's current conclusion and inspect the artifact manifest before making any new pass claim. No A50 bootable release is established by the evidence in this audit.
+
+
+## UFS host integration contract — source comparison (2026-11-19)
+
+The target tree does contain the generic UFSHCD core (`ufshcd.c`, `ufs.h`, generic platform glue, Kconfig and Makefile), but the Samsung Exynos host driver is absent at `drivers/scsi/ufs/ufs-exynos.c`; no Exynos-specific object is selected by the target UFS Makefile. The target DTS nevertheless declares an A50 UFS controller at `0x13520000` with compatible `samsung,exynos-ufs`, associated clocks, reset pinctrl, PHY subnode and FMP linkage.
+
+The Vothcito reference's `ufs-exynos.c` is 5.15-era Samsung host glue. Its OF table in the inspected revision matches `samsung,exynos7-ufs`, not the target DTS compatible `samsung,exynos-ufs`. Do not simply add an OF alias or enable `CONFIG_SCSI_UFS_EXYNOS`: first audit probe resources and compatible semantics, HCI register map, clock names/order, reset sequence, PHY provider, regulator handling, PM callbacks, FMP/inline-crypto hooks, DMA coherency and error recovery against the A50 DTS and vendor boot logs.
+
+The reference PHY core `phy-samsung-ufs.c` only lists `samsung,exynos7-ufs-phy` and `samsung,exynosautov9-ufs-phy` in its match table; `phy-exynos7-ufs.c` provides Exynos7 calibration data, not proof of Exynos9610 PHY compatibility. The target branch's `drivers/phy/samsung/Makefile` was not found at the expected path, so first establish whether any Samsung UFS PHY provider exists in the target tree and whether the DTS PHY node can bind.
+
+**Safe next sequence:** (1) diff the full A50 UFS node and its referenced clocks/resets/PHY/FMP nodes against the reference driver's parsed resources; (2) inspect the exact 5.1 generic UFSHCD platform APIs; (3) port the smallest host glue with a dedicated `samsung,exynos-ufs` match only after register/resource semantics are confirmed; (4) port a PHY calibration implementation only from an Exynos9610-specific source, not by assuming Exynos7 tables match; (5) compile the driver as an isolated object before enabling it in the device configuration. Do not stub FMP, PHY, clock, reset or power transitions to force probe success.
+
+This phase is an audit only. No UFS driver or DT binding was changed.
