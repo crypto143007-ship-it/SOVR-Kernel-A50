@@ -152,7 +152,6 @@ verify_toolchain() {
 	fi
 
 	# SOVR 4.2 requires an exact Clang/LLD pair; never accept rolling Neutron LLVM.
-	if [[ "${BUILD_PREF_COMPILER_VERSION}" == 'neutron' ]]; then
 		local CLANG_VERSION_OUTPUT LLD_VERSION_OUTPUT
 		if ! command -v clang >/dev/null 2>&1 || ! command -v ld.lld >/dev/null 2>&1; then
 			script_echo "E: Required clang or ld.lld executable is missing from PATH."
@@ -174,8 +173,7 @@ verify_toolchain() {
 			script_echo "E: SOVR 4.2 requires LLD 23.1.5; found: $(printf '%s\n' "${LLD_VERSION_OUTPUT}" | sed -n '1p')"
 			exit_script
 		fi
-		script_echo "I: Verified required Clang 23.1.5 and LLD 23.1.5."
-	fi
+	script_echo "I: Verified required Clang 23.1.5 and LLD 23.1.5."
 	# Proton Clang 13
 	# export CLANG_TRIPLE=aarch64-linux-gnu-
 	export CROSS_COMPILE=aarch64-linux-gnu-
