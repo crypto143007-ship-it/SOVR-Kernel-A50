@@ -73,8 +73,8 @@ jobs:
           export LD_LIBRARY_PATH="$TOOLCHAIN_DIR/lib:$TOOLCHAIN_DIR/lib64:${LD_LIBRARY_PATH:-}"
           clang --version | tee clang-version.txt
           ld.lld --version | tee lld-version.txt
-          grep -Eq '^clang version 23\.1\.5([[:space:]]|$)' clang-version.txt
-          grep -Eq '^LLD 23\.1\.5([[:space:]]|$)' lld-version.txt
+          grep -Eq 'clang version 23\.1\.5([[:space:]]|$)' clang-version.txt
+          grep -Eq 'LLD 23\.1\.5([[:space:]]|$)' lld-version.txt
           clang --print-targets | grep -qi 'aarch64'
 
           echo "SOVR_LLVM_TOOLCHAIN_DIR=$TOOLCHAIN_DIR" >> "$GITHUB_ENV"
