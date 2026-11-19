@@ -2,7 +2,7 @@
 
 **Project baseline:** SOVR v4.2 / Linux 4.14.357 / Samsung Galaxy A50 SM-A505F / Exynos 9610  
 **Branch:** `main`  
-**Audited HEAD:** `57a5b0981801d9f63d05eb7b7a31648bb31828a9`
+**Audited HEAD:** `52652d0af4925432cba777aed1ad12da16097b80`
 
 ## Done / Committed
 - `build.sh`: after sourcing the A50 device database, set `PLATFORM_VERSION="${BUILD_ANDROID_PLATFORM}.0.0"` so mkbootimg `--os_version` matches the selected `--android` target. The device DB's legacy static `12.0.0` no longer overrides Android 11/12/14 selection.
@@ -74,3 +74,13 @@
 2. For each candidate newer optimization, verify its upstream/backport provenance, Linux 4.14.357 API dependencies, Samsung vendor interactions, measurable benefit on the A50 4 GB model, and rollback path before proposing a patch.
 3. Keep the current stable config as the control build; test one change at a time with build artifacts, config diffs, runtime logs and battery/thermal/multitasking measurements.
 4. In parallel, continue the pinned LLVM 23.1.5 / LLD 23.1.5 provisioning investigation. Do not add Android 14 KSU CI until toolchain and boot metadata policy are verified.
+
+
+## Build Continuation — 2026-11-19
+- README explicitly documents the expected local toolchain path as `$HOME/toolchains/neutron-clang` and names Clang 23.1.5 / LLVM 23. The directory name is not proof of its contents; actual compiler and linker versions must be checked.
+- `build.sh` now runs a fail-fast toolchain contract check after resolving PATH and before build configuration/compilation. It requires both `clang --version` and `ld.lld --version` to report exactly version string `23.1.5`. This prevents an unintended Clang 24 / rolling compiler or mismatched linker from silently producing a SOVR 4.2 build.
+- The version check captures complete version output before extracting its first line; it deliberately avoids a `head` pipeline so global `pipefail` cannot turn a successful version command into SIGPIPE failure.
+- Commits: `f8bb112` (add pinned LLVM/LLD gate), `52652d0` (make version capture pipefail-safe).
+- README's toolchain path and version requirement are aligned; the source/revision and reproducible provisioning mechanism are still not pinned. No toolchain archive/source was downloaded or trusted in this continuation.
+- No GitHub Actions workflow-dispatch capability is exposed through the connected GitHub actions; no build was launched. No compile, package, or device boot result is claimed.
+- Next: provision the exact ClangBuiltLinux LLVM 23.1.5 / LLD 23.1.5 toolchain at the documented path, then run the A50 Android 14 One UI KSU build in CI. Inspect config, Image, DTB/DTBO, ZIP and SHA-256. Do not flash until artifact checks and device-specific boot metadata are validated.
