@@ -2,7 +2,7 @@
 
 **Project baseline:** SOVR v4.2 / Linux 4.14.357 / Samsung Galaxy A50 SM-A505F / Exynos 9610  
 **Branch:** `main`  
-**Audited HEAD:** `00f81c05415eea5f78fdd91b7f361b42c5c0cbcb`
+**Audited HEAD:** `57a5b0981801d9f63d05eb7b7a31648bb31828a9`
 
 ## Done / Committed
 - `build.sh`: after sourcing the A50 device database, set `PLATFORM_VERSION="${BUILD_ANDROID_PLATFORM}.0.0"` so mkbootimg `--os_version` matches the selected `--android` target. The device DB's legacy static `12.0.0` no longer overrides Android 11/12/14 selection.
@@ -59,3 +59,18 @@
   `ClangBuiltLinux clang 23.1.5 (LLVM 23) + lld 23.1.5 + ThinLTO`.
 - This is a **fixed project requirement**, not an open version-selection question. The README Technical Specifications table already states this exact row and remains aligned.
 - Distinguish the fixed target from the still-unverified acquisition/provisioning mechanism. The exact binaries/source revision, checksum and install path must be validated; do not reinterpret uncertainty about Neutron provisioning as uncertainty about the requested compiler version.
+
+
+## Optimization Target Audit — 2026-11-19
+- User clarified that the **Optimization Target should use the latest worthwhile optimizations**. Interpret this as the newest proven, device-compatible improvements for Exynos 9610 / the 4 GB A50, not blind imports of newer-mainline features or benchmark-only tuning.
+- Confirmed `build.sh` selects `exynos9610-a50_core_defconfig` at line 639. This is the active baseline for the normal A50 build; do not audit or modify only the unused/default defconfig.
+- Active core defconfig already enables: `CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3`, Clang LTO + ThinLTO, `CONFIG_LRU_GEN` (MGLRU implementation), PSI, Energy Adaptive CPUFreq governor, ZSTD ZRAM, ZRAM writeback + LRU writeback, ARM64 crypto acceleration, Exynos thermal/devfreq thermal, EROFS per-CPU high-priority decompression kthreads, F2FS, and KernelSU/SuSFS.
+- Verified source wiring: top-level `Makefile` applies `-O3` when the O3 config is enabled, uses `-flto=thin` for ThinLTO, and adds safe ICF to vmlinux linking; `arch/arm64/Makefile` applies ARMv8 crypto/CRC/SHA2/AES and Cortex-A73 tuning for Exynos9610 Clang builds. README optimization claims are therefore backed by current source/config for these flags.
+- The secondary `exynos9610-a50_default_defconfig` differs materially and is not the config selected by the current build path. Keep future config changes focused on the active `_core_defconfig` unless a separate build variant is explicitly added.
+- No optimization code/config was changed and no compile or boot validation was performed during this audit. Preserve existing thermal/DVFS policy and avoid new overclock/undervolt or aggressive boost changes without measured device evidence.
+
+## Revised Next Step
+1. Continue with a compatibility-first optimization audit of the active `exynos9610-a50_core_defconfig` and its implementation: memory reclaim/MGLRU + PSI, ZRAM writeback, scheduler/CPUFreq/EMS, Mali/GPU DVFS, Exynos thermal/devfreq, storage/EROFS/F2FS and ARM64 crypto.
+2. For each candidate newer optimization, verify its upstream/backport provenance, Linux 4.14.357 API dependencies, Samsung vendor interactions, measurable benefit on the A50 4 GB model, and rollback path before proposing a patch.
+3. Keep the current stable config as the control build; test one change at a time with build artifacts, config diffs, runtime logs and battery/thermal/multitasking measurements.
+4. In parallel, continue the pinned LLVM 23.1.5 / LLD 23.1.5 provisioning investigation. Do not add Android 14 KSU CI until toolchain and boot metadata policy are verified.
