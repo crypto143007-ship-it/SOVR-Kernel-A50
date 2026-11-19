@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# Preserve failures from commands whose output is piped through sed.
+set -o pipefail
 # =========================================
 #         _____              _      
 #        |  ___| __ ___  ___| |__   
@@ -260,29 +263,31 @@ check_defconfig() {
 }
 
 build_kernel() {
+	# A failed make pipeline must stop this function before packaging.
+	set -o pipefail
 	sleep 3
 	script_echo " "
 	BUILD_JOBS=${BUILD_JOBS:-$(nproc --all)}
 
 	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'neutron' || ${BUILD_PREF_COMPILER_VERSION} == 'clang_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_14' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_17' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp' ]]; then
-		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
-		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
+		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
+		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
 	elif [[ ${BUILD_PREF_COMPILER_VERSION} == 'rui' ]]; then
-		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
-		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
+		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
+		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
 	elif [[ ${BUILD_PREF_COMPILER_VERSION} == 'proton' ]]; then
-		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
-		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
+		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
+		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
 	elif [[ ${BUILD_PREF_COMPILER_VERSION} == 'google_snowcone' ]]; then
 		# google_snowcone (aka Clang 12 for Android) uses an additional 'LLVM=1' flag
-		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LLVM=1 AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
-		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LLVM=1 AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
+		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LLVM=1 AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
+		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LLVM=1 AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
 	elif [[ ${BUILD_PREF_COMPILER} == 'clang' ]]; then
-		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LLVM=1 ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
-		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LLVM=1 -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
+		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LLVM=1 ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
+		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LLVM=1 -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
 	else
-		make -C $(pwd) ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
-		make -C $(pwd) -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /'
+		make -C $(pwd) ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
+		make -C $(pwd) -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
 	fi
 }
 
@@ -698,8 +703,8 @@ if [[ ${BUILD_KERNEL_DIRTY} == 'true' ]]; then
 else
 	script_echo " "
 	script_echo "I: Clean build!"
-	make CC=${BUILD_PREF_COMPILER} clean 2>&1 | sed 's/^/     /'
-	make CC=${BUILD_PREF_COMPILER} mrproper 2>&1 | sed 's/^/     /'
+	make CC=${BUILD_PREF_COMPILER} clean 2>&1 | sed 's/^/     /' || { script_echo "E: make clean failed"; exit 1; }
+	make CC=${BUILD_PREF_COMPILER} mrproper 2>&1 | sed 's/^/     /' || { script_echo "E: make mrproper failed"; exit 1; }
 fi
 
 check_defconfig
@@ -789,7 +794,10 @@ elif [[ ${BUILD_ANDROID_PLATFORM} -ge 14 ]] && [[ ${BUILD_KERNEL_CODE} == "oneui
 fi
 
 set_android_version
-build_kernel
+
+# Never allow an Image from an earlier build to be packaged after a failed compile.
+rm -f "$(pwd)/arch/arm64/boot/Image"
+build_kernel || { script_echo "E: Kernel compilation failed; refusing to package an image."; exit 1; }
 
 if [[ ${BUILD_KERNEL_CODE} == 'recovery' ]]; then
 	export_image 
