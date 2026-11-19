@@ -213,3 +213,7 @@
 - Last observed compare before this note: branch was 11 commits ahead and 0 behind main; four files changed: build script, A50 core defconfig, new Android 14 KSU workflow, and DEV_STATE. Main was not modified.
 - The commit combined-status endpoint returned no legacy status entries for the latest build-script commit. This is not proof of a successful or failed Actions run; no completed run conclusion or artifact has been inspected. No kernel compilation or boot success is claimed.
 - Next action: obtain the actual GitHub Actions run result for `SOVR 4.2 — Galaxy A50 Android 14 One UI KSU`, inspect logs and artifacts, and fix the first concrete failure. Do not merge to main, publish a release, or flash the ZIP until the build and package checks pass and a recovery-backed device test is completed.
+
+
+### Branch count correction
+- Final post-check compare: this branch is **14 commits ahead, 0 behind** main; the same four files are changed. The earlier 11-ahead figure above was from the preceding checkpoint, before the last three documentation/workflow commits.
