@@ -78,37 +78,11 @@ download_toolchain() {
 verify_required_llvm_toolchain() {
 	local clang_version
 	local lld_version
-
-	command -v clang >/dev/null 2>&1 || {
-		script_echo "E: clang is not available on PATH."
-		return 1
-	}
-	command -v ld.lld >/dev/null 2>&1 || {
-		script_echo "E: ld.lld is not available on PATH."
-		return 1
-	}
-
+	command -v clang >/dev/null 2>&1 || { script_echo "E: clang is not available on PATH."; return 1; }
+	command -v ld.lld >/dev/null 2>&1 || { script_echo "E: ld.lld is not available on PATH."; return 1; }
 	clang_version="$(clang --version)" || return 1
 	lld_version="$(ld.lld --version)" || return 1
-	clang_version="${clang_version%%
-
-	if [[ "${clang_version}" != *"23.1.5"* ]]; then
-		script_echo "E: Required ClangBuiltLinux clang 23.1.5; found: ${clang_version}"
-		return 1
-	fi
-	if [[ "${lld_version}" != *"23.1.5"* ]]; then
-		script_echo "E: Required LLD 23.1.5; found: ${lld_version}"
-		return 1
-	fi
-
-	script_echo "I: Verified compiler: ${clang_version}"
-	script_echo "I: Verified linker: ${lld_version}"
-}
-
-verify_toolchain() {
-	sleep 2
-	script_echo " "
-
+	clang_version="\${clang_version%%
 	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'neutron' ]]; then
 		AOSP_CLANG="$HOME/toolchains/neutron-clang"
 		if [[ -d "${AOSP_CLANG}" ]]; then
@@ -181,7 +155,7 @@ verify_toolchain() {
 		download_toolchain
 	fi
 
-	# SOVR 4.2 has a fixed compiler/linker contract; fail before config or compilation on mismatch.
+	# Enforce the fixed SOVR 4.2 compiler/linker contract before configuration or compilation.
 	verify_required_llvm_toolchain || exit_script
 
 	# Proton Clang 13
@@ -856,25 +830,7 @@ script_echo "   ${BUILD_KERNEL_OUTPUT}"
 rm -f "${BUILD_CONFIG_DIR}/${BUILD_DEVICE_TMP_CONFIG}"
 sleep 7
 \n'*}"
-	lld_version="${lld_version%%
-
-	if [[ "${clang_version}" != *"23.1.5"* ]]; then
-		script_echo "E: Required ClangBuiltLinux clang 23.1.5; found: ${clang_version}"
-		return 1
-	fi
-	if [[ "${lld_version}" != *"23.1.5"* ]]; then
-		script_echo "E: Required LLD 23.1.5; found: ${lld_version}"
-		return 1
-	fi
-
-	script_echo "I: Verified compiler: ${clang_version}"
-	script_echo "I: Verified linker: ${lld_version}"
-}
-
-verify_toolchain() {
-	sleep 2
-	script_echo " "
-
+	lld_version="\${lld_version%%
 	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'neutron' ]]; then
 		AOSP_CLANG="$HOME/toolchains/neutron-clang"
 		if [[ -d "${AOSP_CLANG}" ]]; then
@@ -946,9 +902,6 @@ verify_toolchain() {
 		script_echo "   Downloading recommended toolchain at ${TOOLCHAIN_EXT}..."
 		download_toolchain
 	fi
-
-	# SOVR 4.2 has a fixed compiler/linker contract; fail before config or compilation on mismatch.
-	verify_required_llvm_toolchain || exit_script
 
 	# Proton Clang 13
 	# export CLANG_TRIPLE=aarch64-linux-gnu-
@@ -1622,18 +1575,16 @@ script_echo "   ${BUILD_KERNEL_OUTPUT}"
 rm -f "${BUILD_CONFIG_DIR}/${BUILD_DEVICE_TMP_CONFIG}"
 sleep 7
 \n'*}"
-
-	if [[ "${clang_version}" != *"23.1.5"* ]]; then
-		script_echo "E: Required ClangBuiltLinux clang 23.1.5; found: ${clang_version}"
+	if [[ "\${clang_version}" != *"23.1.5"* ]]; then
+		script_echo "E: Required ClangBuiltLinux clang 23.1.5; found: \${clang_version}"
 		return 1
 	fi
-	if [[ "${lld_version}" != *"23.1.5"* ]]; then
-		script_echo "E: Required LLD 23.1.5; found: ${lld_version}"
+	if [[ "\${lld_version}" != *"23.1.5"* ]]; then
+		script_echo "E: Required LLD 23.1.5; found: \${lld_version}"
 		return 1
 	fi
-
-	script_echo "I: Verified compiler: ${clang_version}"
-	script_echo "I: Verified linker: ${lld_version}"
+	script_echo "I: Verified compiler: \${clang_version}"
+	script_echo "I: Verified linker: \${lld_version}"
 }
 
 verify_toolchain() {
@@ -1711,9 +1662,6 @@ verify_toolchain() {
 		script_echo "   Downloading recommended toolchain at ${TOOLCHAIN_EXT}..."
 		download_toolchain
 	fi
-
-	# SOVR 4.2 has a fixed compiler/linker contract; fail before config or compilation on mismatch.
-	verify_required_llvm_toolchain || exit_script
 
 	# Proton Clang 13
 	# export CLANG_TRIPLE=aarch64-linux-gnu-
