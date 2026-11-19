@@ -224,3 +224,12 @@
 - The dedicated LLVM 23.1.5 path fails closed if its binaries are absent or either version is wrong; it does not auto-download or fall back to Neutron. Other legacy selectors remain explicit opt-ins, not defaults.
 - Latest compare after this change: 16 commits ahead, 0 behind main; changed files remain .github/workflows/sovr-a50-android14-ksu.yml, DEV_STATE.md, arch/arm64/configs/exynos9610-a50_core_defconfig, build.sh. Main remains unchanged.
 - CI has not yet produced an observable completed result or artifact in this session. The next engineering step remains reviewing the actual Actions run.
+
+
+## CI failure diagnosis and correction — 2026-11-19 (20:47 PKT)
+- Inspected the latest Android 14 One UI KSU workflow run (run 9, commit e9d0667). The archive download, signed checksum manifest verification, pinned SHA-256 check, extraction, and execution of both compiler binaries succeeded.
+- Actual version output is prefixed with `ClangBuiltLinux`: `ClangBuiltLinux clang version 23.1.5` and `ClangBuiltLinux LLD 23.1.5`. The workflow's anchored regular expressions incorrectly expected `clang` / `LLD` at column 1, causing a false failure before build-script validation or kernel compilation.
+- Fixed only those two regex anchors in `.github/workflows/sovr-a50-android14-ksu.yml`; they now match the version token anywhere in the vendor-identifying output while still requiring exact 23.1.5.
+- Fix commit: `a7e05af95248598d87ef2f5a2d1470288471e2a1` (`ci: accept ClangBuiltLinux version prefixes`). This push triggers a fresh CI run on the isolated branch.
+- No kernel compilation, ZIP packaging, artifact validation, or device boot has yet succeeded. Main branch is unchanged. Do not flash or merge until the new run is inspected through build and artifact-validation completion.
+- Next: inspect the run triggered by `a7e05af`; if toolchain validation passes, diagnose the first actual Kbuild/config/package failure. Retain the exact Clang/LLD 23.1.5 pin and explicit LLD selection.
