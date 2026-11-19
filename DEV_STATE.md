@@ -165,3 +165,41 @@
 3. Resolve the A50 4-GiB DTB/DTBO memory map and reserved-memory overlap before treating the Linux 5.1 integration branch as a device build.
 4. Continue UFS/PHY/FMP and CAL/ACPM/TZDEV dependency closure; compile each subsystem separately before enabling it.
 5. Preserve main's known-good SOVR 4.2 / Linux 4.14.357 baseline. No full build, ZIP, flash or boot result is claimed by this audit.
+
+
+## Continuation update — 2026-11-19 (LLVM 23.1.5 build gate and A50 KSU CI)
+
+### Isolated build branch
+- Working branch: `build/llvm-23.1.5-enforcement`.
+- Compared with main: 9 commits ahead, 0 behind at this checkpoint. Main remains untouched.
+- No pull request was created.
+
+### Pinned toolchain implementation
+- Added an explicit `--toolchain llvm_23.1.5` path in `build.sh`.
+- The path is supplied through `SOVR_LLVM_TOOLCHAIN_DIR` or defaults to `$HOME/toolchains/llvm-23.1.5`.
+- The script now fails closed if either compiler binary is absent or if `clang --version` is not exactly 23.1.5 or `ld.lld --version` is not exactly 23.1.5.
+- The matching build path invokes both config and compile make steps with `LLVM=1`, explicit `LD=ld.lld`, `HOSTLD=ld.lld`, and LLVM binutils. Existing legacy toolchain selectors were not removed or silently redirected.
+- Official ClangBuiltLinux kernel.org stable archive selected: `llvm-23.1.5-x86_64.tar.xz` (83 MiB).
+- Signed SHA-256 entry from kernel.org `sha256sums.asc`: `b69433120ad62420d789f601c58a5472873c724be088c99a70b72fd30ca4af3c`.
+- Kernel.org checksum-autosigner primary fingerprint pinned in CI: `B8868C80BA62A1FFFAF5FDA9632D3A06589DA6B1`.
+- The CI job imports that full fingerprint from the Ubuntu keyserver, verifies the signed checksum manifest and checks the archive hash before extraction. The extracted binaries are then checked for exact Clang/LLD versions and the AArch64 backend.
+- This is the kernel.org stable LLVM distribution documented by ClangBuiltLinux, built from LLVM release tags and PGO-optimized with tc-build. It is not rolling Neutron and does not substitute LLVM 23.1.6.
+
+### KernelSU compatibility correction
+- Audited `drivers/kernelsu/Kconfig` and `drivers/kernelsu/Kbuild`: the Kprobes hook option explicitly warns it should not be used below Linux 5.10.
+- Confirmed `kernel/reboot.c` already contains the required `ksu_handle_sys_reboot` manual-hook integration.
+- Added `CONFIG_KSU_MANUAL_HOOK=y` to the A50 core defconfig so the Linux 4.14.357 build selects the manual hook path instead of the Kprobes hook path.
+- CI checks `CONFIG_KSU=y`, `CONFIG_KSU_SUSFS=y`, `CONFIG_KSU_MANUAL_HOOK=y`, and that `CONFIG_KSU_KPROBES_HOOK` is disabled.
+
+### Dedicated Android 14 CI
+- Added `.github/workflows/sovr-a50-android14-ksu.yml`, scoped to this isolated branch plus manual dispatch.
+- Build target: SM-A505F / Exynos9610 / Android 14 / One UI / SELinux Enforcing / KernelSU + SuSFS.
+- Uses the pinned LLVM 23.1.5 toolchain, `BUILD_JOBS=2`, shell syntax validation, and strict pipeline failure handling.
+- CI checks `CONFIG_LTO_CLANG=y`, `CONFIG_THINLTO=y`, and the existing O3 optimization symbol. The correct ThinLTO symbol in this tree is `CONFIG_THINLTO`, not `CONFIG_LTO_CLANG_THIN`.
+- Artifact validation requires a nonempty boot image, a KSU ZIP containing Image, dtb.img and the AnyKernel installer, plus the final config, package manifest and SHA-256 hashes.
+- The build workflow has been committed and its source files re-fetched for verification. A completed GitHub Actions run, successful compile, artifact, install or device boot has **not** yet been observed. Do not mark this build passed until the actual run conclusion and artifacts are inspected.
+
+### Safety boundary and next step
+- No Linux 5.1 integration-branch files were changed in this step.
+- The 6-GiB Exynos9610 base-DTB memory declaration versus the user's approximately 3.893-GiB live A50 memory map remains a P0 blocker on the Linux 5.1 integration branch. Do not package or flash that branch.
+- Next: inspect the new LLVM 23.1.5 CI run and logs; fix any toolchain, Kbuild, KSU, ThinLTO or packaging failure; verify artifact contents and manifest. Only after a clean build should the package be considered for controlled installation testing.
