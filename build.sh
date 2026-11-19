@@ -79,7 +79,28 @@ verify_toolchain() {
 	sleep 2
 	script_echo " "
 
-	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'neutron' ]]; then
+	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'llvm_23.1.5' ]]; then
+		AOSP_CLANG="${SOVR_LLVM_TOOLCHAIN_DIR:-$HOME/toolchains/llvm-23.1.5}"
+		if [[ ! -x "${AOSP_CLANG}/bin/clang" || ! -x "${AOSP_CLANG}/bin/ld.lld" ]]; then
+			script_echo "E: Pinned LLVM 23.1.5 toolchain is missing or incomplete at ${AOSP_CLANG}."
+			exit 1
+		fi
+		export PATH="${AOSP_CLANG}/bin:${TOOLCHAIN_EXT}/bin:$PATH"
+		export LD_LIBRARY_PATH="${AOSP_CLANG}/lib:${AOSP_CLANG}/lib64:${TOOLCHAIN_EXT}/lib:${LD_LIBRARY_PATH:-}"
+		local CLANG_VERSION_OUTPUT
+		local LLD_VERSION_OUTPUT
+		CLANG_VERSION_OUTPUT=$(clang --version) || { script_echo "E: clang --version failed"; exit 1; }
+		LLD_VERSION_OUTPUT=$(ld.lld --version) || { script_echo "E: ld.lld --version failed"; exit 1; }
+		if [[ ! "${CLANG_VERSION_OUTPUT%%$'\n'*}" =~ ^clang[[:space:]]version[[:space:]]23\.1\.5([[:space:]]|$) ]]; then
+			script_echo "E: Required Clang 23.1.5; found: ${CLANG_VERSION_OUTPUT%%$'\n'*}"
+			exit 1
+		fi
+		if [[ ! "${LLD_VERSION_OUTPUT%%$'\n'*}" =~ ^LLD[[:space:]]23\.1\.5([[:space:]]|$) ]]; then
+			script_echo "E: Required LLD 23.1.5; found: ${LLD_VERSION_OUTPUT%%$'\n'*}"
+			exit 1
+		fi
+		script_echo "I: Verified Clang 23.1.5 and LLD 23.1.5 from ${AOSP_CLANG}"
+	elif [[ ${BUILD_PREF_COMPILER_VERSION} == 'neutron' ]]; then
 		AOSP_CLANG="$HOME/toolchains/neutron-clang"
 		if [[ -d "${AOSP_CLANG}" ]]; then
 			script_echo "I: Using Neutron Clang (LLVM 22+) toolchain from ${AOSP_CLANG}"
@@ -269,7 +290,10 @@ build_kernel() {
 	script_echo " "
 	BUILD_JOBS=${BUILD_JOBS:-$(nproc --all)}
 
-	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'neutron' || ${BUILD_PREF_COMPILER_VERSION} == 'clang_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_14' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_17' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp' ]]; then
+	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'llvm_23.1.5' ]]; then
+		make -C "$(pwd)" LLVM=1 CC="${CCACHE}clang" LD=ld.lld HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" HOSTLD=ld.lld AR=llvm-ar HOSTAR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
+		make -C "$(pwd)" LLVM=1 CC="${CCACHE}clang" LD=ld.lld HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" HOSTLD=ld.lld AR=llvm-ar HOSTAR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
+	elif [[ ${BUILD_PREF_COMPILER_VERSION} == 'neutron' || ${BUILD_PREF_COMPILER_VERSION} == 'clang_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_14' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_17' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp' ]]; then
 		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
 		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
 	elif [[ ${BUILD_PREF_COMPILER_VERSION} == 'rui' ]]; then
