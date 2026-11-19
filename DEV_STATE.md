@@ -287,3 +287,11 @@
 - Inspected `tools/make/package/mint.sh`: for SDK 34/35/36 (One UI 6+ / Fresh 6), the installer explicitly selects "pure SOVR kernel defaults (EROFS system)" and does not copy any `files_oneui` or `files_fresh` assets. The Android 14 package staging omission is therefore intentional for this installer branch, not a missing-payload defect.
 - The `files_oneui` / `files_fresh` payloads are used for older One UI 3 and One UI 4/5 paths respectively. Do not add them to Android 14 without changing installer behavior and a demonstrated requirement.
 - The Android 14 package still must be checked for correct Image/DTB, AnyKernel scripts, boot metadata and safe target device handling.
+
+
+### Latest CI/branch checkpoint — 2026-11-19
+- Run 12 (`44592526809`, source `f6ab309`) remains in the build step; no conclusion or artifacts yet.
+- Run 13 (`44593224972`, source `56d2081`) is installing dependencies. It includes the build-script SOVR override but predates the workflow env setting, so it is not the authoritative SOVR filename test.
+- Run 14 (`44593241570`, source `437b432`) is installing dependencies and includes both the explicit empty `SOVR_BUILD_BRANCH` environment override and the build-script support. This is the authoritative release-name/build test.
+- All three jobs currently run in parallel; avoid triggering additional full builds until they finish. Run 12 is useful to test diagnostic artifact collection; run 14 is the release identity test.
+- Latest branch comparison: `build/llvm-23.1.5-enforcement` is 29 commits ahead and 2 behind `main`; merge base remains `b49265e31c3776fae7c661de4d1a36c17d35d551`; main HEAD is `7ed3f5ab8d0e2d35da0354e6079ecc93982d2d74`. Keep isolated; do not merge yet.
