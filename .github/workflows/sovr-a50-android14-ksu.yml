@@ -1,0 +1,146 @@
+name: SOVR 4.2 — Galaxy A50 Android 14 One UI KSU
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'build/llvm-23.1.5-enforcement'
+    paths:
+      - 'build.sh'
+      - '.github/workflows/sovr-a50-android14-ksu.yml'
+      - 'arch/arm64/configs/exynos9610-a50_core_defconfig'
+      - 'kernel/configs/**'
+      - 'arch/arm64/boot/**'
+      - 'tools/make/**'
+      - 'Documentation/device-db/**'
+
+permissions:
+  contents: read
+
+jobs:
+  a50-android14-oneui-ksu:
+    name: A50 / Android 14 / One UI / KSU / LLVM 23.1.5
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+    env:
+      BUILD_JOBS: 2
+    steps:
+      - name: Check out isolated build branch
+        uses: actions/checkout@v4
+
+      - name: Install kernel and packaging dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            bc bison build-essential flex gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
+            libelf-dev libssl-dev libncurses-dev lib32stdc++6 libc6-dev-i386 jq \
+            xz-utils curl gnupg zip unzip python3 device-tree-compiler ccache rsync \
+            lz4 zstd libxml2 libzstd1 zlib1g liblzma5 libicu70
+
+      - name: Download and authenticate ClangBuiltLinux LLVM 23.1.5
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOLCHAIN_URL="https://www.kernel.org/pub/tools/llvm/files"
+          KEY_FINGERPRINT="B8868C80BA62A1FFFAF5FDA9632D3A06589DA6B1"
+          mkdir -p "$HOME/toolchains" "$RUNNER_TEMP/llvm-download"
+          cd "$RUNNER_TEMP/llvm-download"
+
+          curl --fail --location --retry 3 "$TOOLCHAIN_URL/sha256sums.asc" -o sha256sums.asc
+          curl --fail --location --retry 3 "$TOOLCHAIN_URL/llvm-23.1.5-x86_64.tar.xz" -o llvm-23.1.5-x86_64.tar.xz
+
+          gpg --batch --keyserver hkps://keyserver.ubuntu.com --recv-keys "$KEY_FINGERPRINT"
+          IMPORTED_FINGERPRINT="$(gpg --batch --with-colons --fingerprint "$KEY_FINGERPRINT" | awk -F: '$1 == "fpr" { print $10; exit }')"
+          test "$IMPORTED_FINGERPRINT" = "$KEY_FINGERPRINT"
+
+          gpg --batch --status-fd=1 --verify sha256sums.asc > checksum-signature.status 2> checksum-signature.stderr
+          grep -F "[GNUPG:] VALIDSIG $KEY_FINGERPRINT " checksum-signature.status
+
+          awk '$2 == "llvm-23.1.5-x86_64.tar.xz" { print; found = 1 } END { exit !found }' sha256sums.asc > llvm-23.1.5.sha256
+          sha256sum --check llvm-23.1.5.sha256
+
+          tar -xJf llvm-23.1.5-x86_64.tar.xz -C "$HOME/toolchains"
+          CLANG_PATH="$(find "$HOME/toolchains" -path '*/bin/clang' -print -quit)"
+          test -n "$CLANG_PATH"
+          TOOLCHAIN_DIR="${CLANG_PATH%/bin/clang}"
+          test -x "$TOOLCHAIN_DIR/ld.lld"
+
+          export PATH="$TOOLCHAIN_DIR:$PATH"
+          export LD_LIBRARY_PATH="$TOOLCHAIN_DIR/../lib:$TOOLCHAIN_DIR/../lib64:${LD_LIBRARY_PATH:-}"
+          clang --version | tee clang-version.txt
+          ld.lld --version | tee lld-version.txt
+          grep -Eq '^clang version 23\.1\.5([[:space:]]|$)' clang-version.txt
+          grep -Eq '^LLD 23\.1\.5([[:space:]]|$)' lld-version.txt
+          clang --print-targets | grep -qi 'aarch64'
+
+          echo "SOVR_LLVM_TOOLCHAIN_DIR=$TOOLCHAIN_DIR" >> "$GITHUB_ENV"
+          echo "$TOOLCHAIN_DIR" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=$TOOLCHAIN_DIR/../lib:$TOOLCHAIN_DIR/../lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          cp checksum-signature.status checksum-signature.stderr llvm-23.1.5.sha256 clang-version.txt lld-version.txt "$GITHUB_WORKSPACE/"
+
+      - name: Validate build script syntax and pinned toolchain
+        run: |
+          set -euo pipefail
+          bash -n build.sh
+          test -x "$SOVR_LLVM_TOOLCHAIN_DIR/bin/clang"
+          test -x "$SOVR_LLVM_TOOLCHAIN_DIR/bin/ld.lld"
+          clang --version
+          ld.lld --version
+
+      - name: Build SOVR 4.2 A50 Android 14 One UI KSU
+        run: |
+          set -euo pipefail
+          ./build.sh --ksu --automated --device a50 --variant oneui --android 14 --toolchain llvm_23.1.5
+
+      - name: Validate and collect build artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP_PATH="$(find . -maxdepth 1 -type f -name '*.zip' -print -quit)"
+          test -n "$ZIP_PATH"
+          test -s tools/make/boot.img
+          grep -q '^CONFIG_KSU=y$' .config
+          grep -q '^CONFIG_KSU_SUSFS=y$' .config
+          grep -q '^CONFIG_LTO_CLANG_THIN=y$' .config
+          grep -q '^CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y$' .config
+
+          mkdir -p artifacts
+          cp .config artifacts/kernel_config_a50_android14_oneui_ksu
+          cp tools/make/boot.img artifacts/boot.img
+          cp "$ZIP_PATH" artifacts/kernel-package.zip
+          unzip -p "$ZIP_PATH" Image > artifacts/Image
+          unzip -p "$ZIP_PATH" dtb.img > artifacts/dtb.img
+          unzip -Z1 "$ZIP_PATH" > artifacts/package-contents.txt
+
+          grep -Fxq 'Image' artifacts/package-contents.txt
+          grep -Fxq 'dtb.img' artifacts/package-contents.txt
+          grep -Fxq 'mint.sh' artifacts/package-contents.txt
+          grep -Fxq 'META-INF/com/google/android/update-binary' artifacts/package-contents.txt
+          test -s artifacts/Image
+          test -s artifacts/dtb.img
+
+          {
+            echo "Baseline: SOVR 4.2 / Linux 4.14.357"
+            echo "Device: Samsung Galaxy A50 SM-A505F / Exynos9610 / 4 GB RAM"
+            echo "Android target: 14 / One UI / SELinux Enforcing"
+            echo "Root: KernelSU + SuSFS"
+            echo "Toolchain: Clang 23.1.5 / LLD 23.1.5 / ThinLTO"
+            echo "Boot image OS version: 14.0.0"
+            echo "Device DB patch level: ${PLATFORM_PATCH_LEVEL:-read from build log; static source value not changed}"
+            echo "Package source filename: $ZIP_PATH"
+          } > artifacts/BUILD-MANIFEST.txt
+          sha256sum artifacts/* > artifacts/SHA256SUMS
+
+      - name: Upload A50 Android 14 KSU validation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sovr42-a50-android14-oneui-ksu-llvm2315
+          if-no-files-found: error
+          path: |
+            artifacts/**
+            checksum-signature.status
+            checksum-signature.stderr
+            llvm-23.1.5.sha256
+            clang-version.txt
+            lld-version.txt
