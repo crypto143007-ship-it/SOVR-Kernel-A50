@@ -122,3 +122,46 @@
 - Kernel.org currently lists `llvm-23.1.5-x86_64.tar.xz` (83 MiB) and a detached `.tar.sign`, but this is a kernel.org LLVM build, not yet verified as the requested ClangBuiltLinux distribution. Do not silently substitute it or describe it as ClangBuiltLinux. LLVM 23.1.6 is newer but remains outside the specified 23.1.5 contract.
 - No source changes, toolchain installation, build, ZIP packaging, or boot test were performed in this continuation. Main branch remains unchanged except this handoff note.
 - Next safe implementation: on a dedicated branch, add an exact Clang/LLD 23.1.5 verification after PATH setup, pass `LD=ld.lld` explicitly in both configuration and compile make invocations, then add an Android 14 One UI KSU workflow that provisions the verified ClangBuiltLinux distribution from a pinned immutable source/checksum. Run CI and inspect logs/artifacts before merging.
+
+
+## Continuation audit — 2026-11-19 (live fork inspection)
+
+### Branch and PR inventory
+- Fork inspected: `crypto143007-ship-it/SOVR-Kernel-A50`; original upstream remains read-only/out of scope.
+- Branches returned by GitHub: `main`, `migration/linux-5.1-assessment`, and `linux-5.1-exynos9610-integration`.
+- No open pull requests were returned for this fork.
+- Main's recent commit search shows `b49265e31c3776fae7c661de4d1a36c17d35d551` as the newest commit at this inspection; the audited-HEAD field above was stale.
+- Created isolated working branch `build/llvm-23.1.5-enforcement` from main. Main was not modified.
+
+### Build-script edit safety correction
+- The first staged automated edit to `build.sh` expanded the file unexpectedly. It was immediately reverted on the isolated branch.
+- Restoration commit: `5c4e7720b06a7a8069af330af1915f6546646e46`.
+- Re-fetched the file and verified it is byte-for-byte identical to main's baseline blob `27238dbec68279e6af3b067c9c6251ba9360f9fa`, 32,322 characters / 825 lines.
+- No malformed script remains on the branch. No kernel build was launched. Do not rely on the failed edit or claim the LLVM/LLD gate is implemented.
+- Next script change must be a small, exact, single-purpose patch, checked by a diff and shell syntax validation before any further update.
+
+### Toolchain source clarification
+- The ClangBuiltLinux kernel.org documentation states that its stable prebuilt LLVM toolchains are provided on kernel.org, built from signed `llvmorg-<version>` tags and PGO-optimized using tc-build. It explicitly recommends PATH plus `LLVM=1` for kernel trees older than 5.18, which applies to this Linux 4.14.357 tree.
+- The kernel.org index lists `llvm-23.1.5-x86_64.tar.xz` and a matching detached `.tar.sign`; LLVM 23.1.6 is also listed but is not permitted by the project's fixed 23.1.5 requirement.
+- This makes the kernel.org 23.1.5 slim archive the official ClangBuiltLinux stable-toolchain candidate, not a rolling Neutron substitute. Still pending: verify the archive's detached signature and signer fingerprint, signed checksum, extracted layout, exact `clang --version` and `ld.lld --version`, host dependencies, and actual Linux 4.14.357 build compatibility. No archive was downloaded or executed in this session.
+- Source: https://kernel.org/pub/tools/llvm/ and https://www.kernel.org/doc/html/latest/kbuild/llvm.html.
+
+### Linux 5.1 integration branch — critical A50 memory finding
+- The dedicated integration branch is a Linux 5.1.0 source tree and has a generic ARM64/Exynos9610 baseline workflow. Its successful Image/DTB/DTBO smoke artifacts are not a bootable A50 kernel.
+- The current `arch/arm64/boot/dts/exynos/exynos9610.dts` declares three 2-GiB memory banks: `memory@80000000`, `memory@880000000`, and `memory@900000000` (6 GiB total).
+- The current `exynos9610-universal9610.dts` overlay does not override or remove those memory nodes. The workflow explicitly asserts all three nodes, so the merged diagnostic DTB retains the 6-GiB declaration.
+- The earlier live-vs-SOVR DTB audit records the user's SM-A505F live map as four ranges totaling approximately 3.893 GiB: 0x80000000/0x3ab00000, 0xc0000000/0x20000000, 0xe1900000/0x1e700000, and 0x880000000/0x80000000. It explicitly warns against using the 6-GiB SOVR base map for the 4-GiB device.
+- This is a P0 device-tree blocker. Do not package or flash the integration branch DTB/DTBO. Before any A50 boot image work, reconcile the exact live DTB, reserved-memory carveouts, bootloader handoff and stock DTBO selection; then make the board-specific 4-GiB memory map authoritative and update CI assertions accordingly.
+- The A50 overlay itself is diagnostic only; it is not proven to replace the stock DTBO partition.
+
+### Remaining integration blockers
+- Pinctrl Exynos9610 source and Kconfig wiring are present in the integration tree; physical EINT/wakeup/suspend/resume remain untested.
+- Samsung Exynos UFS host/PHY/FMP, CAL/CMUCAL/PMUCAL, ACPM, TZDEV/TEEGris and Mali platform integration remain major porting blockers according to the current vendor audit.
+- The migration assessment branch remains Linux 4.14.357 source with partial ACPM hardening, not a Linux 5.1 port. Keep it separate from the dedicated upstream v5.1 tree.
+
+### Next steps
+1. Verify the official kernel.org ClangBuiltLinux LLVM 23.1.5 archive signature, signer fingerprint and signed checksum; inspect package and runtime dependencies on a disposable runner.
+2. Apply a small, reviewed build-script patch on this branch only: select the verified toolchain path, require exact Clang/LLD 23.1.5, and explicitly select `LD=ld.lld` in both config and compile invocations. Do not reintroduce rolling Neutron.
+3. Resolve the A50 4-GiB DTB/DTBO memory map and reserved-memory overlap before treating the Linux 5.1 integration branch as a device build.
+4. Continue UFS/PHY/FMP and CAL/ACPM/TZDEV dependency closure; compile each subsystem separately before enabling it.
+5. Preserve main's known-good SOVR 4.2 / Linux 4.14.357 baseline. No full build, ZIP, flash or boot result is claimed by this audit.
