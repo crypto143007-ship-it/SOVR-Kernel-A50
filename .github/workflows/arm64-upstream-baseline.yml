@@ -59,6 +59,13 @@ jobs:
       - name: Build upstream ARM64 Image and DTBs
         run: |
           make -j2 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- HOSTCFLAGS=-fcommon Image dtbs
+          test -s arch/arm64/boot/Image
+          test -s arch/arm64/boot/dts/exynos/exynos9610.dtb
+          dtc -I dtb -O dts -o exynos9610-built.dts arch/arm64/boot/dts/exynos/exynos9610.dtb 2> exynos9610-dtb-decompile-warnings.log
+          grep -q 'memory@80000000' exynos9610-built.dts
+          grep -q 'memory@880000000' exynos9610-built.dts
+          grep -q 'memory@900000000' exynos9610-built.dts
+          grep -q 'samsung,exynos9610-clock' exynos9610-built.dts
           cp .config exynos9610-smoke.config
 
       - name: Compile Samsung A50 UNIVERSAL9610 DTBO from SOVR 4.2 sources
