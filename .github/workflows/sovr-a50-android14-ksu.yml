@@ -57,7 +57,10 @@ jobs:
           gpg --batch --status-fd=1 --verify sha256sums.asc > checksum-signature.status 2> checksum-signature.stderr
           grep -F "[GNUPG:] VALIDSIG $KEY_FINGERPRINT " checksum-signature.status
 
-          awk '$2 == "llvm-23.1.5-x86_64.tar.xz" { print; found = 1 } END { exit !found }' sha256sums.asc > llvm-23.1.5.sha256
+          EXPECTED_SHA256="b69433120ad62420d789f601c58a5472873c724be088c99a70b72fd30ca4af3c"
+          ACTUAL_SHA256="$(awk '$2 == "llvm-23.1.5-x86_64.tar.xz" { print $1; found = 1 } END { exit !found }' sha256sums.asc)"
+          test "$ACTUAL_SHA256" = "$EXPECTED_SHA256"
+          printf '%s  %s\\n' "$EXPECTED_SHA256" "llvm-23.1.5-x86_64.tar.xz" > llvm-23.1.5.sha256
           sha256sum --check llvm-23.1.5.sha256
 
           tar -xJf llvm-23.1.5-x86_64.tar.xz -C "$HOME/toolchains"
