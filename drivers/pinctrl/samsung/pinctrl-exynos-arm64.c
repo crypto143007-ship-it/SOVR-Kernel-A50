@@ -424,6 +424,20 @@ const struct samsung_pinctrl_of_match_data exynos7_of_data __initconst = {
 };
 
 
+/* Exynos9610 bank register layouts, matching SOVR 4.2 definitions.
+ * Non-ALIVE: CON/DAT/PUD/DRV/CONPDN/PUDPDN widths 4/1/4/4/2/4.
+ * ALIVE: CON/DAT/PUD/DRV widths 4/1/4/4.
+ */
+static struct samsung_pin_bank_type exynos9610_bank_type_off = {
+	.fld_width = { 4, 1, 4, 4, 2, 4, },
+	.reg_offset = { 0x00, 0x04, 0x08, 0x0c, 0x10, 0x14, },
+};
+
+static struct samsung_pin_bank_type exynos9610_bank_type_alive = {
+	.fld_width = { 4, 1, 4, 4, },
+	.reg_offset = { 0x00, 0x04, 0x08, 0x0c, },
+};
+
 /* Exynos9610 data ported from the A50 reference implementation. */
 /* pin banks of exynos9610 pin-controller 0 (ALIVE) */
 static struct samsung_pin_bank_data exynos9610_pin_banks0[] __initdata = {
