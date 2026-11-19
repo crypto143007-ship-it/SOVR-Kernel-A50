@@ -506,3 +506,54 @@ The user supplied a verified handoff containing the stock boot.img, dt.img, dtbo
 6. Audit S-Boot secure/debug/framebuffer reservations against v5.1 memblock and existing reserved-memory handling; reserve each range once.
 7. Only then expand to SysMMU, UFS and remaining board peripherals. The 6 GB and non-F variant support remains a release target, not a verified result.
 
+
+
+## Phase 18 — clock-provider API/dependency audit against Linux 5.1 (2026-11-19)
+
+Compared the exact Vothcito reference branch source with the target Linux 5.1 Samsung clock Kconfig/Makefile. This is a source-level audit; no vendor clock code has been copied or enabled in this phase.
+
+### Reference driver facts
+
+Reference: Vothcito/android_kernel_samsung_exynos9610_a50, branch exynos9610-port, file drivers/clk/samsung/clk-exynos9610.c, blob dcd2d2f8c85fa1f741db0beb5d70b7dc21138579 (389 lines).
+
+The driver includes:
+- Linux Common Clock Framework interfaces (clk, clkdev, clk-provider, OF and OF address mapping).
+- soc/samsung/cal-if.h.
+- Exynos9610 CMUCAL VCLK, node and QCH generated headers.
+- Exynos9610 clockout header.
+- Samsung composite clock-provider extension header.
+
+Its initialization path maps the controller registers, calls cal_if_init(np), creates a Samsung clock provider, registers fixed external oscillator and extensive HWACG/special VCLK tables, adds the OF clock provider, and schedules late VCLK rate programming. The late routine calls cal_clk_setrate() for the audio FM divider and CMGP I2C/USI muxes.
+
+**Critical failure behaviour:** the reference clock init panics if register mapping, CAL initialization or provider allocation fails. Do not carry this panic-on-failure behaviour into an experimental v5.1 integration without proving the firmware/clock initialization contract and safe failure policy. A missing CAL provider must not be papered over with successful no-op clock operations.
+
+### Kconfig/Kbuild mismatch
+
+- The reference Makefile places clk-exynos9610.o and composite.o under the broad EXYNOS_ARM64_COMMON_CLK object selection.
+- The target v5.1 Makefile currently places the Exynos5433/Exynos7 drivers under EXYNOS_ARM64_COMMON_CLK but does not contain the Exynos9610 driver or Samsung composite extension object.
+- The target v5.1 Kconfig has COMMON_CLK_SAMSUNG selecting EXYNOS_ARM64_COMMON_CLK for ARM64 + ARCH_EXYNOS. Reusing that broad symbol would build the new Exynos9610 object on unrelated Exynos ARM64 configurations and is not an acceptable isolated integration gate.
+- Add a dedicated SOC_EXYNOS9610 clock-provider symbol only after its dependencies are ready; it must depend on the Exynos9610 SoC selector, COMMON_CLK_SAMSUNG and the exact CAL/CMUCAL configuration. Do not enable it by default in the generic smoke config.
+
+### Dependency closure to resolve before code import
+
+1. Samsung clock provider framework extensions: samsung_clk_provider, samsung_register_vclk, samsung_register_of_fixed_ext, samsung_clk_of_add_provider, Samsung fixed-rate helpers and the composite clock implementation. Compare every helper/type with the target v5.1 clk.h / clk-provider.h and existing Samsung provider implementation.
+2. CAL public interface: cal_if_init, cal_clk_setrate and all structures/macros exposed by soc/samsung/cal-if.h. Audit register mapping, error propagation, locking, and whether any calls require ACPM IPC.
+3. CMUCAL shared core: CMUCAL IDs/types, VCLK descriptors, VCLK registration, node/QCH lookup, SFR access, LUT and PLL metadata. Determine exact source/object dependencies from symbol references rather than importing the full reference directory.
+4. Exynos9610 generated data: cmucal-vclk.h, cmucal-node.h, cmucal-qch.h, clkout_exynos9610.h and the corresponding C tables (node, QCH, SFR, VCLK, VCLK LUT and CAL data). Keep generated IDs and tables from one matching reference revision.
+5. External oscillator and clockout support: validate the 26-MHz oscillator input and clockout muxes against A50 hardware/DTS; do not assume optional clockout outputs are needed for basic boot.
+6. ACPM: keep ACPM DVFS and firmware IPC out of the first clock compile unless a referenced symbol is proven to require them. If needed, port the transport ABI, shared-memory layout, timeouts and error paths as a separate prerequisite.
+7. Suspend/resume and runtime ordering: audit clock register save/restore, provider initialization order, parent clocks, early console clock dependencies and late VCLK programming. A compile-only provider is not runtime-safe by itself.
+
+### DTS consequence
+
+The existing SoC DTS contains a node compatible with samsung,exynos9610-clock and a broad set of consumer clock references. The DTB compiler accepts phandles and clock IDs because the binding header is present; it does not verify that Linux 5.1 has a matching provider. Until the provider and all referenced IDs are implemented, consumers must remain disabled or the port must be explicitly labelled DTB-only. Do not remove or renumber the SOVR binding IDs just to satisfy the generic upstream build.
+
+### Next implementation gate
+
+- Build a source/symbol manifest for the clock driver and Samsung composite helper against the exact pinned reference commit.
+- Port the smallest compile-only Samsung clock-provider API layer into a private/dedicated symbol, with no provider registration in the generic ARM64 config.
+- Port CAL interface and CMUCAL core/data in isolated object groups; run compile-only checks before linking the full clock driver.
+- Only after the provider links, test DT clock ID coverage against every active A50 consumer and decide which devices can safely be enabled.
+- Keep the SoC clock node from causing an unconditional panic if a dependency is unavailable; runtime init policy must be reviewed before enabling the provider.
+
+No clock source was changed and no CAL/CMUCAL object build is claimed in this phase.
