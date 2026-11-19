@@ -69,3 +69,21 @@ Shared CAL dependencies in the same reference directory include `cal-if.c`, `cmu
 6. Enable a provider only after its parent clocks, reset controls, register resources, firmware dependencies and failure paths are complete.
 
 The existing successful CI run is a generic ARM64 upstream Image/DTB smoke build plus a diagnostic universal9610 overlay compile/merge. It does **not** compile the vendor CAL/CMUCAL/ACPM sources and does not prove A50 runtime readiness. The generic `exynos9610-universal9610.dts` overlay uses board_id/board_rev and is not Samsung's stock hw_rev DTBO table; it must remain diagnostic and must not be packaged as the replacement for the stock DTBO partition.
+
+
+## Exynos9610 pinctrl gap — v5.1 versus Vothcito reference (2026-11-19)
+
+A direct comparison of the target branch and the Vothcito `exynos9610-port` reference found a concrete missing runtime implementation, despite the DTS compiling:
+
+- The target Linux 5.1 `drivers/pinctrl/samsung/pinctrl-exynos-arm64.c` contains only 425 lines and its ARM64 data ends with `exynos7_of_data`. It has no Exynos9610 pin-bank tables and no `exynos9610_of_data`.
+- The target `pinctrl-samsung.c` OF match table has no `samsung,exynos9610-pinctrl` entry. Therefore the six Exynos9610 pinctrl controller nodes in `exynos9610.dts` can compile into a DTB but do not bind to an Exynos9610-specific pinctrl data set in this kernel.
+- The Vothcito reference adds Exynos9610-specific ALIVE, CMGP, DISPAUD, FSYS, TOP and SHUB bank tables, plus `exynos9610_of_data` and the OF match entry.
+- The reference also extends the pin-bank data model with `fltcon_offset` and defines `EXYNOS9_PIN_BANK_EINTN/G/W` macros. The target v5.1 `struct samsung_pin_bank_data` and runtime `struct samsung_pin_bank` do not contain `fltcon_offset`; blindly copying the 5.15 data block will not compile and could misprogram EINT filter registers even if mechanically adapted.
+
+**Porting gate:** first compare the v5.1 and reference pinctrl suspend/resume, EINT filter programming, wakeup IRQ demultiplexing, resource indexing and pin-bank initialization semantics. Port the minimum required structure/macro changes with explicit v5.1 adaptations, then add the Exynos9610 bank tables and OF match entry. Build `CONFIG_PINCTRL_EXYNOS_ARM64=y` and verify all six controller instances resolve the expected resources and bank names. Do not enable this DTS pinctrl set as operational until the driver match and EINT paths are complete.
+
+This is a source/API audit only; no pinctrl code was changed in this phase. The existing DTB/DTBO smoke compile cannot detect this missing runtime binding.
+
+## Latest baseline CI observation (2026-11-19)
+
+Run `44459925266` for commit `12bee58939e07e0bf5736f55af7147c95ce41d5c` was still in progress at the time of inspection. Job `arm64-baseline` completed checkout, dependency installation and ARM64 defconfig; its upstream ARM64 Image/DTB build step was still running. DTBO diagnostic compile, vendor source inventory, readiness audit and artifact publication were pending, and no artifact had yet been published. Do not report this run as passed until GitHub records a completed successful conclusion.
