@@ -2,7 +2,7 @@
 
 **Project baseline:** SOVR v4.2 / Linux 4.14.357 / Samsung Galaxy A50 (SM-A505F, Exynos 9610)  
 **Branch:** `main`  
-**State recorded against HEAD:** `9811fd3818f8dd6668a13a643702f4aba2387b76`
+**State recorded against HEAD:** `f47bb6ba94901a691a5f201543145f1d88c3aa39`
 
 ## Done / Committed
 - Existing repository baseline inspected; no kernel source, configuration, or workflow changes made in this session.
@@ -10,7 +10,7 @@
   - `.github/workflows/development.yml`
   - `.github/workflows/galaxy-a50.yml`
 - Confirmed A50/Exynos9610 device-tree sources exist, including `arch/arm64/boot/dts/exynos/oneui14/exynos9610.dts` and `arch/arm64/boot/dts/exynos/exynos9610-universal9610.dts`.
-- Added this state file to establish a persistent project handoff.
+- Added `DEV_STATE.md` in commit `f47bb6ba94901a691a5f201543145f1d88c3aa39` to establish a persistent project handoff.
 
 ## Failed / Do Not Repeat
 - Do not restore `EXYNOS9610_LINUX_51_INTEGRATION_PLAN.md` to `main`: commit `9811fd3` explicitly reverted its accidental addition.
