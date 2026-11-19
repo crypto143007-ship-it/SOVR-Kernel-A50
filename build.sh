@@ -46,7 +46,7 @@ CURRENT_BUILD_USER=$(whoami)
 
 # Toolchain options
 BUILD_PREF_COMPILER='clang'
-BUILD_PREF_COMPILER_VERSION='neutron'
+BUILD_PREF_COMPILER_VERSION='llvm_23.1.5'
 
 # Local toolchain directory
 TOOLCHAIN=$HOME/toolchains/exynos9610_toolchains_fresh
@@ -612,7 +612,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -t|--toolchain)
-      BUILD_PREF_COMPILER_VERSION="${2:-neutron}"
+      BUILD_PREF_COMPILER_VERSION="${2:-llvm_23.1.5}"
       shift; shift
       ;;
     -h|--help)
