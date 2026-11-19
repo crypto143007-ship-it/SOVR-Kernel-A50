@@ -270,8 +270,8 @@ build_kernel() {
 	BUILD_JOBS=${BUILD_JOBS:-$(nproc --all)}
 
 	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'neutron' || ${BUILD_PREF_COMPILER_VERSION} == 'clang_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_14' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_17' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp' ]]; then
-		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
-		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
+		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" LD=ld.lld LLVM=1 AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
+		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" LD=ld.lld LLVM=1 AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
 	elif [[ ${BUILD_PREF_COMPILER_VERSION} == 'rui' ]]; then
 		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
 		make -C $(pwd) CC=${BUILD_PREF_COMPILER} LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
