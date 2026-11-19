@@ -117,3 +117,32 @@ The base DTB string inventory contains the three expected memory node names `mem
 These checks prove the DTB and diagnostic overlay were compiled and merged. They do not prove that this overlay is a drop-in replacement for the stock DTBO partition, nor that the merged tree matches every stock bootloader/ROM revision. Continue to preserve the stock DTBO path until a byte-level/table-index and hardware compatibility audit is complete.
 
 The vendor readiness report still identifies major missing Linux 5.1 runtime pieces in the target tree: Samsung Exynos UFS host/FMP, Exynos CAL/CMUCAL/PMUCAL, ACPM, TZDEV and Samsung Mali platform integration. The successful CI run is therefore a platform-DTB and generic kernel build milestone, not a bootable daily-driver release.
+
+
+## Reconciliation note — source tree rechecked (2026-11-19 16:01 PKT)
+
+This section supersedes conflicting earlier prose in this document. The latest branch contents were fetched directly from GitHub at this checkpoint.
+
+### Pinctrl: source support is present
+
+The current target branch does contain the Exynos9610 pinctrl implementation:
+- `pinctrl-exynos-arm64.c` defines `exynos9610_bank_type_alive`, six bank arrays (ALIVE, CMGP, DISPAUD, FSYS, TOP, SHUB), six controller descriptors, and `exynos9610_of_data`.
+- `pinctrl-exynos.h` defines the `EXYNOS9_PIN_BANK_EINTN/G/W` macros and initializes `fltcon_offset`.
+- `pinctrl-samsung.h` declares `exynos9610_of_data`.
+- `pinctrl-samsung.c` has the `samsung,exynos9610-pinctrl` OF match.
+
+Therefore the earlier claim that these source pieces were absent is stale. Source presence is verified; successful compilation and hardware EINT/wakeup/suspend/resume behavior still require independent CI and device testing. Do not interpret the existence of a CI artifact as proof of physical correctness.
+
+### UFS and CAL: target source files not found at expected paths
+
+Direct fetches against this branch returned 404 for:
+- `drivers/scsi/ufs/ufs-exynos.c`
+- `drivers/soc/samsung/cal-if/exynos9610/cal_data.c`
+- `drivers/soc/samsung/cal-if/Kconfig`
+- `drivers/phy/samsung/Makefile`
+
+This is a path-level absence check, not a complete repository-wide symbol search. Before importing code, enumerate the target tree's actual UFS, PHY and Samsung SoC directories and inspect its existing generic UFS host/PHY interfaces. The Vothcito 5.15 reference files are not drop-in 5.1 sources.
+
+### CI status wording correction
+
+Do not describe run `44459925266` as successful solely from a downloaded artifact or a prior assistant summary. The branch audit previously recorded it as in progress, and the recorded observations conflict. Query the workflow run's current conclusion and inspect the artifact manifest before making any new pass claim. No A50 bootable release is established by the evidence in this audit.
