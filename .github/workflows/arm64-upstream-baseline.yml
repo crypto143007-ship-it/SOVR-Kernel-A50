@@ -25,6 +25,7 @@ on:
       - 'virt/**'
       - '.github/workflows/arm64-upstream-baseline.yml'
       - 'docs/EXYNOS9610-VENDOR-PORTING-AUDIT.md'
+      - 'EXYNOS9610_LINUX_51_INTEGRATION_PLAN.md'
   workflow_dispatch:
 
 permissions:
