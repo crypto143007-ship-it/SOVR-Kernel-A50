@@ -265,3 +265,9 @@
 4. Investigate repeated LLVM broken-pipe diagnostics and confirm whether they originate from toolchain output handling, ccache, or build subprocesses; require a clean log or documented benign cause.
 5. Audit whether DTBO is required for this A50 packaging path and whether the current installer/package includes the necessary DTB/DTBO assets.
 6. Only after these checks pass, consider merging the isolated Android 14 KSU workflow/build changes. Preserve SOVR 4.2 Linux 4.14.357 as the control baseline; resume Linux 5.1 migration separately.
+
+
+## Branch synchronization check — 2026-11-19
+- After the diagnostic workflow commit, compared `build/llvm-23.1.5-enforcement` with `main`: isolated branch is 24 commits ahead and 2 commits behind; merge base is `b49265e31c3776fae7c661de4d1a36c17d35d551`. Current `main` HEAD is `7ed3f5ab8d0e2d35da0354e6079ecc93982d2d74`.
+- Do not merge this branch yet. Reconcile the two newer main commits and review the complete diff first; preserve main as source of truth.
+- Diagnostic CI run 12 was created for `f6ab309e8cb0348d2226a08614e7f5be6d4b1e4b` (run ID `44592526809`). At this check it was still in progress before dependency installation; no result or artifact is available yet.
