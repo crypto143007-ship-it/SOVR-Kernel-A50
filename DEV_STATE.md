@@ -295,3 +295,11 @@
 - Run 14 (`44593241570`, source `437b432`) is installing dependencies and includes both the explicit empty `SOVR_BUILD_BRANCH` environment override and the build-script support. This is the authoritative release-name/build test.
 - All three jobs currently run in parallel; avoid triggering additional full builds until they finish. Run 12 is useful to test diagnostic artifact collection; run 14 is the release identity test.
 - Latest branch comparison: `build/llvm-23.1.5-enforcement` is 29 commits ahead and 2 behind `main`; merge base remains `b49265e31c3776fae7c661de4d1a36c17d35d551`; main HEAD is `7ed3f5ab8d0e2d35da0354e6079ecc93982d2d74`. Keep isolated; do not merge yet.
+
+
+## Continuation checkpoint — 2026-11-20 00:00 PKT
+- Re-polled runs 12/13/14. All three jobs have completed checkout, dependency installation, LLVM 23.1.5 authentication and compiler/linker version checks, and build-script syntax validation.
+- All three remain in the kernel build step at the latest poll; validation/upload steps are pending and no artifacts are published yet.
+- Run 12 job ID: `135802024028`; run 13: `135804541182`; run 14: `135804598188`.
+- The job-log endpoint returned 404 while the active job was running; do not treat that as a build failure or infer compilation status from unavailable logs.
+- Do not launch more parallel full builds. Wait for run 14 (authoritative empty SOVR_BUILD_BRANCH override) and use run 12 to test failure-safe diagnostics. After completion, inspect validation report and artifacts before any flash/merge decision.
