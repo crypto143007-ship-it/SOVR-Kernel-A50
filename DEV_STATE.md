@@ -233,3 +233,11 @@
 - Fix commit: `a7e05af95248598d87ef2f5a2d1470288471e2a1` (`ci: accept ClangBuiltLinux version prefixes`). This push triggers a fresh CI run on the isolated branch.
 - No kernel compilation, ZIP packaging, artifact validation, or device boot has yet succeeded. Main branch is unchanged. Do not flash or merge until the new run is inspected through build and artifact-validation completion.
 - Next: inspect the run triggered by `a7e05af`; if toolchain validation passes, diagnose the first actual Kbuild/config/package failure. Retain the exact Clang/LLD 23.1.5 pin and explicit LLD selection.
+
+
+## Follow-up: internal build-script version gate — 2026-11-19 (20:48 PKT)
+- Static review after correcting the workflow matcher found the same anchored-prefix assumption inside `build.sh`'s pinned toolchain gate: it required the first line to begin exactly with `clang version` and `LLD`, while the verified distribution prints `ClangBuiltLinux clang version` and `ClangBuiltLinux LLD`.
+- Corrected both Bash regexes to match the required version token while retaining exact 23.1.5 enforcement. No compiler/version fallback was added.
+- Commit: `0effcad12ddc028ed452ac2ffa06c87e4ca7feaf` (`build: accept ClangBuiltLinux version prefixes`). The change triggers another isolated-branch CI run.
+- Workflow matcher correction is in `a7e05af`; this second correction is necessary or the build would still stop before make.
+- No kernel compilation or package has yet been produced. Main remains unchanged. Await the new CI run and inspect every stage, especially Kconfig resolution, KernelSU manual-hook selection, ThinLTO and package/DTB output.
