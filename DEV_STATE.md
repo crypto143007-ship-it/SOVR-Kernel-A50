@@ -2,7 +2,7 @@
 
 **Project baseline:** SOVR v4.2 / Linux 4.14.357 / Samsung Galaxy A50 SM-A505F / Exynos 9610  
 **Branch:** `main`  
-**Audited HEAD:** `061bc5b7913ebab88f6af04856b7bff11d5080b2`
+**Audited HEAD:** `b49265e31c3776fae7c661de4d1a36c17d35d551`
 
 ## Done / Committed
 - `build.sh`: after sourcing the A50 device database, set `PLATFORM_VERSION="${BUILD_ANDROID_PLATFORM}.0.0"` so mkbootimg `--os_version` matches the selected `--android` target. The device DB's legacy static `12.0.0` no longer overrides Android 11/12/14 selection.
