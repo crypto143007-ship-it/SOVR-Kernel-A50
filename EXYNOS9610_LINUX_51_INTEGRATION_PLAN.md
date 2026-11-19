@@ -459,3 +459,19 @@ The SoC DTS currently references `samsung,exynos9610-clock`, but the v5.1 clock 
 The live FDT timer clock-frequency value recorded in the earlier audit is 0x018CBA80, which is 26,000,000 Hz (26.0 MHz, not 25.6 MHz). The current SOVR DTS timer property is <26000000>, so the numeric values agree. Preserve the value pending confirmation of the property’s consumer/semantics; do not change it based on the earlier arithmetic typo.
 
 **No bootability is claimed.** The next implementation gate is a clean v5.1 DTB build with warning classification, followed by separately compiled CAL/CMUCAL and clock-provider units. Never flash the generic upstream baseline or the current DTS-only artifacts to the handset.
+
+
+## Phase 16 — Linux 5.1 pinctrl runtime gap and current build state (2026-11-19)
+
+The DTB smoke build is not sufficient to establish pinctrl functionality. Direct target/reference source comparison found:
+
+- The Linux 5.1 target's `drivers/pinctrl/samsung/pinctrl-exynos-arm64.c` has Exynos5433/Exynos7 data only; no Exynos9610 bank tables or `exynos9610_of_data`.
+- The target's `pinctrl-samsung.c` OF match table has no `samsung,exynos9610-pinctrl` match. The six Exynos9610 controller nodes in the imported DTS therefore have no matching SoC-specific pinctrl data in the current target kernel.
+- Vothcito's Linux 5.15 reference adds six Exynos9610 controller datasets (ALIVE, CMGP, DISPAUD, FSYS, TOP, SHUB), an OF match entry, new `EXYNOS9_PIN_BANK_*` macros, and `fltcon_offset` support in the pin-bank structures.
+- The v5.1 structures do not contain `fltcon_offset`; copying the 5.15 bank tables verbatim is both a compile failure and a potential EINT filter-register correctness issue.
+
+Next pinctrl implementation gate: audit and adapt the v5.1 bank initialization, EINT filter, wake IRQ, suspend/resume and resource-index semantics first. Then port the minimum data-model/macro changes and Exynos9610 bank tables, add the OF match, and compile with `CONFIG_PINCTRL_EXYNOS_ARM64=y`. Verify all six controller resources and bank names before marking pinctrl operational. The current DTB compile does not test this runtime binding.
+
+The full handoff's stock boot/DTB/DTBO contract is recorded in Phase 15: stock `boot.img` is header v1 with no ramdisk or appended DTB; stock base table is `dt.img`; SOVR 4.2 writes only its base `dtb.img` to the dtb partition and leaves the Samsung stock `dtbo` partition untouched. The stock overlay selection is by the six inclusive hardware-revision ranges mirrored in table `custom0/custom1` and overlay root `dtbo-hw_rev/dtbo-hw_rev_end`, not generic `board_id/board_rev`. The live evidence remains limited to one SM-A505F 4 GB EUX/SWA OPEN revision-6 handset.
+
+Latest run `44459925266` at commit `12bee58939e07e0bf5736f55af7147c95ce41d5c` was still in progress at last inspection: checkout, dependency install and ARM64 defconfig passed; the upstream Image/DTB step was running; DTBO diagnostic compile, source inventory, readiness audit and artifact upload were pending. No artifact was available at that inspection. This is not a completed build result.
