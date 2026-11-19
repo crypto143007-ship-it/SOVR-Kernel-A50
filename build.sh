@@ -641,7 +641,7 @@ VERSION=$(grep -m 1 VERSION "$(pwd)/Makefile" | sed 's/^.*= //g')
 PATCHLEVEL=$(grep -m 1 PATCHLEVEL "$(pwd)/Makefile" | sed 's/^.*= //g')
 SUBLEVEL=$(grep -m 1 SUBLEVEL "$(pwd)/Makefile" | sed 's/^.*= //g')
 
-BUILD_KERNEL_BRANCH=${GITHUB_REF##*/}
+BUILD_KERNEL_BRANCH=${SOVR_BUILD_BRANCH-${GITHUB_REF##*/}}
 BUILD_DATE=$(date +%s)
 BUILD_CONFIG_DIR=$(pwd)/arch/arm64/configs
 SUB_CONFIGS_DIR=${ORIGIN_DIR}/kernel/configs
