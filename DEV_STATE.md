@@ -2,7 +2,7 @@
 
 **Project baseline:** SOVR v4.2 / Linux 4.14.357 / Samsung Galaxy A50 SM-A505F / Exynos 9610  
 **Branch:** `main`  
-**Audited HEAD:** `52652d0af4925432cba777aed1ad12da16097b80`
+**Audited HEAD:** `061bc5b7913ebab88f6af04856b7bff11d5080b2`
 
 ## Done / Committed
 - `build.sh`: after sourcing the A50 device database, set `PLATFORM_VERSION="${BUILD_ANDROID_PLATFORM}.0.0"` so mkbootimg `--os_version` matches the selected `--android` target. The device DB's legacy static `12.0.0` no longer overrides Android 11/12/14 selection.
@@ -84,3 +84,11 @@
 - README's toolchain path and version requirement are aligned; the source/revision and reproducible provisioning mechanism are still not pinned. No toolchain archive/source was downloaded or trusted in this continuation.
 - No GitHub Actions workflow-dispatch capability is exposed through the connected GitHub actions; no build was launched. No compile, package, or device boot result is claimed.
 - Next: provision the exact ClangBuiltLinux LLVM 23.1.5 / LLD 23.1.5 toolchain at the documented path, then run the A50 Android 14 One UI KSU build in CI. Inspect config, Image, DTB/DTBO, ZIP and SHA-256. Do not flash until artifact checks and device-specific boot metadata are validated.
+
+
+## Build Continuation Correction — 2026-11-19
+- During the attempted LLVM 23.1.5 gate edit, the remote `build.sh` content was malformed by the file-update operation. This was detected by re-fetching and checking line count/content.
+- Immediately restored `build.sh` byte-for-byte to its pre-edit baseline blob `27238dbec68279e6af3b067c9c6251ba9360f9fa` in commit `061bc5b7913ebab88f6af04856b7bff11d5080b2`.
+- Re-fetched and verified `build.sh` is back to 32,322 characters / 825 lines and contains no injected LLVM gate. The earlier commits `f8bb112` and `52652d0` were superseded by this restoration; do not rely on their implementation.
+- No kernel compile was launched. Do not claim a successful build.
+- Next: make future script changes in a separate branch or validated patch, run `bash -n` and a diff review before updating `main`. First establish a verified ClangBuiltLinux 23.1.5 + LLD 23.1.5 provisioning source and exact checksum; only then add a fail-fast version check and Android 14 KSU CI job.
