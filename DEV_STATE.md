@@ -239,3 +239,12 @@
 - Next: let the branch push trigger the workflow and inspect its run in GitHub Actions; then provision the authenticated LLVM 23.1.5 archive on a runner and perform a minimal compiler/linker smoke test before the full A50 build. Keep `main` untouched.
 
 - Follow-up review caught and fixed over-escaping in the new CI grep literals for `${CCACHE}` and `${TOOLCHAIN_EXT}`: the shell assertions now search for the actual unescaped source text in `build.sh`. Workflow correction commit: `1e0db71bbd734ef03309ca3914089b22e01e51b4`. The workflow is committed but still awaits an observed Actions execution.
+
+
+## A50 Core ThinLTO CI Coverage — 2026-11-20 06:55 PKT
+- Re-audited the actual active `arch/arm64/configs/exynos9610-a50_core_defconfig` and top-level kernel `Makefile`. The A50 core config explicitly enables `CONFIG_LD_LLD=y`, `CONFIG_LTO_CLANG=y`, and `CONFIG_THINLTO=y`; the Makefile's `CONFIG_THINLTO` branch adds `-flto=thin` and its Clang LTO path uses LLVM archive/symbol tooling. This confirms the selected 4 GB A50 core config—not a generic/default config—is wired for the required ThinLTO + LLD build.
+- Extended `.github/workflows/sovr42-build-script-validation.yml` so pushes and pull requests touching the active A50 core defconfig or top-level Makefile trigger validation. Added exact assertions for LLD, Clang LTO, ThinLTO config symbols, `-flto=thin`, and the `LD=ld.lld LLVM=1` build invocation.
+- Workflow commits: `9be751aa0ef13558a4d9d3780c2d0b73707ffd41` (add A50 core config/Makefile paths and initial step), `dc4798a05d047c88bbc3ccdf66bf6f0d857e8d6f` (tighten assertions to require actual `-flto=thin` and `CONFIG_LD_LLD=y`).
+- Re-fetched the workflow and confirmed both path filters and all assertions are present. This is source inspection only; no GitHub Actions run, bash syntax execution, compiler invocation, kernel compile, package build, or device boot was observed. Do not report CI as passing.
+- Branch comparison at this checkpoint: 31 commits ahead of `main`, zero behind. Only the experimental branch was changed; `main` remains untouched.
+- Next: authenticate and provision the exact ClangBuiltLinux LLVM 23.1.5 + LLD 23.1.5 archive, smoke-test compiler/linker and host dependencies, then run the A50 Android 14 One UI KSU build. Preserve `CONFIG_THINLTO`, the current active core config, and the Linux 4.14.357 SOVR 4.2 baseline.
