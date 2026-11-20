@@ -46,7 +46,7 @@ CURRENT_BUILD_USER=$(whoami)
 
 # Toolchain options
 BUILD_PREF_COMPILER='clang'
-BUILD_PREF_COMPILER_VERSION='neutron'
+BUILD_PREF_COMPILER_VERSION='clang_23_1_5'
 
 # Local toolchain directory
 TOOLCHAIN=$HOME/toolchains/exynos9610_toolchains_fresh
@@ -71,6 +71,12 @@ exit_script() {
 }
 
 download_toolchain() {
+	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'clang_23_1_5' ]]; then
+		script_echo "E: Pinned ClangBuiltLinux 23.1.5 toolchain is not installed."
+		script_echo "   Install the authenticated LLVM 23.1.5 archive into ${TOOLCHAIN_EXT}."
+		script_echo "   Automatic fallback to Neutron or another compiler is disabled."
+		exit_script
+	fi
 	git clone https://gitlab.com/TenSeventy7/exynos9610_toolchains_fresh.git ${TOOLCHAIN_EXT} --single-branch -b ${BUILD_PREF_COMPILER_VERSION} --depth 1 2>&1 | sed 's/^/     /'
 	verify_toolchain
 }
@@ -79,7 +85,16 @@ verify_toolchain() {
 	sleep 2
 	script_echo " "
 
-	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'neutron' ]]; then
+	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'clang_23_1_5' ]]; then
+		if [[ -x "${TOOLCHAIN_EXT}/bin/clang" && -x "${TOOLCHAIN_EXT}/bin/ld.lld" ]]; then
+			script_echo "I: Using pinned ClangBuiltLinux 23.1.5 from ${TOOLCHAIN_EXT}"
+			export PATH="${TOOLCHAIN_EXT}/bin:$PATH"
+			export LD_LIBRARY_PATH="${TOOLCHAIN_EXT}/lib:${TOOLCHAIN_EXT}/lib64:$LD_LIBRARY_PATH"
+		else
+			script_echo "E: Missing ${TOOLCHAIN_EXT}/bin/clang or ld.lld."
+			exit_script
+		fi
+	elif [[ ${BUILD_PREF_COMPILER_VERSION} == 'neutron' ]]; then
 		AOSP_CLANG="$HOME/toolchains/neutron-clang"
 		if [[ -d "${AOSP_CLANG}" ]]; then
 			script_echo "I: Using Neutron Clang (LLVM 22+) toolchain from ${AOSP_CLANG}"
@@ -301,7 +316,7 @@ build_kernel() {
 	script_echo " "
 	BUILD_JOBS=${BUILD_JOBS:-$(nproc --all)}
 
-	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'neutron' || ${BUILD_PREF_COMPILER_VERSION} == 'clang_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_14' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_17' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp' ]]; then
+	if [[ ${BUILD_PREF_COMPILER_VERSION} == 'clang_23_1_5' || ${BUILD_PREF_COMPILER_VERSION} == 'neutron' || ${BUILD_PREF_COMPILER_VERSION} == 'clang_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_15' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_14' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp_17' || ${BUILD_PREF_COMPILER_VERSION} == 'aosp' ]]; then
 		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" LD=ld.lld LLVM=1 AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip ${BUILD_DEVICE_TMP_CONFIG} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
 		make -C $(pwd) CC="${CCACHE}${BUILD_PREF_COMPILER}" HOSTCC="${CCACHE}clang" HOSTCXX="${CCACHE}clang++" LD=ld.lld LLVM=1 AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip -j${BUILD_JOBS} LOCALVERSION="${LOCALVERSION}" 2>&1 | sed 's/^/     /' || return $?
 	elif [[ ${BUILD_PREF_COMPILER_VERSION} == 'rui' ]]; then
