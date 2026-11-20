@@ -166,3 +166,12 @@
 - Corrected the earlier A14 packaging concern: `build_package()` copies no extra One UI payload for Android 14, but `tools/make/package/mint.sh` explicitly detects SDK 34/35/36 and selects “pure SOVR kernel defaults (EROFS system)” without copying `files_fresh` or `files_oneui`. Therefore the absence of an A14-specific payload directory is not by itself a packaging defect. Keep the Android 12/13 Fresh performance init script and One UI 3 fstab/RAM Plus payload out of A14 packages; their sysfs, cgroup and swap assumptions are not established for the target ROM.
 - The active build remains blocked until a trusted, exact ClangBuiltLinux 23.1.5 / LLD 23.1.5 toolchain is installed at the expected path. No toolchain archive was provisioned, no compiler executed, no CI workflow was dispatched, and no kernel Image/DTB/DTBO/ZIP was built or boot-tested.
 - **Next:** authenticate and provision the pinned LLVM 23.1.5 toolchain; then run `bash -n build.sh`, test the version gate with matching and mismatching mock executables, and execute the A50 Android 14 One UI KSU build. Validate generated config, Image, DTB/DTBO, ZIP file list and checksums before considering flash.
+
+
+## Build Script Audit Fix — 2026-11-20
+- Audited all pipeline sites in `build.sh` after the script-wide `set -o pipefail` addition.
+- Found one latent interaction in the Magisk packaging helper: `tr ... /dev/urandom | head -c 16` can cause the producer to receive SIGPIPE when `head` exits, leaving a nonzero pipeline status under `pipefail`.
+- Replaced that unbounded producer pipeline with a finite 8-byte read using `od -An -N8 -tx1 /dev/urandom | tr -d ' \\n'`, plus strict 16-hex-character validation and an explicit error return. This preserves the existing random-seed format and avoids changing kernel configuration or runtime tuning.
+- Commit: `eab3233ca8339b7b711f731d3a7c93a8da6a22db`; new `build.sh` blob: `9553a67ac9ccfa211d46be141a1150395c2ef8af`. Re-fetched the file and verified the replacement block.
+- Not yet run: `bash -n`, execution with `/dev/urandom` mocks, full build, packaging, or device test. No compile success is claimed.
+- Next: add/run automated shell regression tests for the seed helper and exact compiler/linker gate on a runner; then verify and provision the immutable ClangBuiltLinux 23.1.5 toolchain before A14 One UI KSU CI.
