@@ -627,7 +627,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -t|--toolchain)
-      BUILD_PREF_COMPILER_VERSION="${2:-neutron}"
+      BUILD_PREF_COMPILER_VERSION="${2:-clang_23_1_5}"
       shift; shift
       ;;
     -h|--help)
