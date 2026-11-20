@@ -191,3 +191,11 @@
 - Workflow correction commit: `088f9594ad1f02eb2ed98a615d793d819c5c2c6d`; workflow blob `ffe54287ec0829a22dd18feec33b63ff3b57448a`.
 - Re-fetched and inspected branch files. The validation workflow still has no observed Actions run/status; the GitHub connector exposes no workflow-run listing or dispatch action. The current main commit has no reported status checks through the connected status endpoint (empty statuses), which is not proof of a passing build.
 - Next: run the workflow in GitHub Actions and inspect the result; then perform signed LLVM 23.1.5 archive verification and runtime checks before adding toolchain provisioning or the Android 14 One UI KSU build job. Do not merge or claim kernel build success until artifacts are validated.
+
+
+## LLVM 23.1.5 Provisioning Research — 2026-11-20
+- Rechecked the kernel.org LLVM files index: the exact x86_64 archive `llvm-23.1.5-x86_64.tar.xz` is published (83 MiB), with a matching `llvm-23.1.5-x86_64.tar.sign` (228 bytes). The index also lists 23.1.6, but SOVR's required version remains exactly 23.1.5; do not silently upgrade.
+- Official kernel.org signature guidance states that these detached `.tar.sign` signatures are made over the uncompressed `.tar` stream. Verification should therefore use `xz -cd llvm-23.1.5-x86_64.tar.xz | gpg --verify llvm-23.1.5-x86_64.tar.sign -` (or decompress to `.tar` then verify). Kernel.org documents WKD key retrieval as `gpg --locate-keys <developer>@kernel.org` and recommends independently validating the key via its web of trust/TOFU.
+- Sources reviewed: kernel.org LLVM files index and kernel.org signature instructions. This confirms availability and verification procedure only; it does not establish the signer fingerprint or validate the archive bytes/signature in this session.
+- Outstanding security gate: retrieve the archive, detached signature, and signer public key on a disposable runner; record the complete fingerprint from the key material and independently verify it against the developer's published identity before accepting the signature. Do not pin an unverified fingerprint or embed a guessed SHA-256.
+- No toolchain archive has been downloaded or installed, and no compiler version command, runtime-library check, kernel compile, package build, or device boot test has been run. Main remains untouched; experimental branch remains isolated.
