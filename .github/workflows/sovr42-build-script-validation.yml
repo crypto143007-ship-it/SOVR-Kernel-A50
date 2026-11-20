@@ -32,6 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           grep -Fq "BUILD_PREF_COMPILER_VERSION='clang_23_1_5'" build.sh
+          grep -Fq 'BUILD_PREF_COMPILER_VERSION="${2:-clang_23_1_5}"' build.sh
           grep -Fq 'Using pinned ClangBuiltLinux 23.1.5' build.sh
           grep -Fq 'Automatic fallback to Neutron or another compiler is disabled.' build.sh
 
