@@ -1,39 +1,63 @@
 # Linux 5.1 Exynos9610 A50 Integration State
 
-**Active target:** Linux 5.1.0 kernel baseline for Samsung Galaxy A50 SM-A505F / Exynos 9610 / ARM64.  
-**Branch:** `linux-5.1-exynos9610-integration`  
-**Priority:** establish a complete, buildable and bootable kernel before adding performance optimizations.  
-**Do not use:** SOVR 4.2 / Linux 4.14.357 build workflow or its LLVM 23.1.5 pin as assumptions for this branch.
+**Active project:** Unified Linux 5.1 kernel for Samsung Galaxy A50 / Exynos9610 / ARM64.
+**Reference baseline:** SOVR 4.2 (Linux 4.14.357), used as the known-good hardware/boot-chain reference, not as the target kernel source.
+**Active branch:** `linux-5.1-exynos9610-integration`.
+**Priority:** finish a complete, reproducible and bootable A50 kernel before performance tuning.
+**Do not modify:** `main` or the working SOVR 4.2 / Linux 4.14.357 baseline as part of this migration.
 
-## Current source audit — 2026-11-20
+## Authoritative handoff and design rules
 
-- Confirmed top-level Makefile reports VERSION=5, PATCHLEVEL=1, SUBLEVEL=0.
-- The branch is a Linux 5.1.0 source baseline, not yet a complete A50 board integration: `build.sh`, `README.md`, `DEV_STATE.md`, and the previously assumed `arch/arm64/configs/exynos9610-a50_core_defconfig` path are absent on this branch at the time of audit.
-- `arch/arm64/boot/dts/Makefile` lists the Exynos subdirectory; `arch/arm64/boot/dts/exynos/Makefile` contains an `exynos9610.dtb` target, but the expected `exynos9610.dtsi` file could not be fetched at that path. Resolve exact DTS filenames and dependencies before treating DT build as complete.
-- Generic UFS core and platform support exist, but the target branch's `drivers/scsi/ufs/Kconfig` and `Makefile` have no `SCSI_UFS_EXYNOS` option/object.
-- Target branch's `drivers/phy/samsung/Kconfig` and `Makefile` have no `PHY_SAMSUNG_UFS` option/object.
-- Reference repository `Vothcito/android_kernel_samsung_exynos9610_a50` contains an Exynos UFS host implementation (`drivers/scsi/ufs/ufs-exynos.c` and `ufs-exynos.h`) and its Kconfig/Makefile wiring, plus Samsung UFS PHY Kconfig/Makefile wiring. This is a donor reference only; it has not been copied or declared Linux 5.1 compatible.
-- The donor UFS host implementation includes Exynos HCI/UniPro register handling, clocks, PHY coordination, link/power-change callbacks and platform-specific setup. A complete port must identify the correct PHY source files and A50-specific compatible strings, clocks, regulators, resets, syscon and DT bindings.
-- No source files have been modified in this checkpoint except this state document. No compiler or build environment is available through this GitHub source inspection, so no compile, DT validation, image packaging or boot test is claimed.
+The complete user-supplied `A50_HANDOFF_FOR_CHATGPT.md` was reread on 2026-11-20. The reconciled rules are recorded in `EXYNOS9610_LINUX_51_INTEGRATION_PLAN.md`, Phase 21.
 
-## Done / committed
-- Created this state document to establish an accurate 5.1-specific continuation record.
+- One shared kernel and one shared static base DTB for the A50 family; no per-RAM kernel or DTB forks.
+- Preserve the SOVR 4.2 base DTB's three static 2-GiB memory placeholders and one-entry DT table (`custom0=0`, `custom1=0xFF`). Samsung S-Boot rewrites the final memory nodes/bootargs at boot.
+- Keep the stock Samsung DTBO partition untouched. SOVR does not ship a custom matching DTBO. Samsung overlays are selected by hardware-revision ranges, not the repository's generic board_id/board_rev diagnostic overlay.
+- Never copy the live FDT's S-Boot-generated /chosen bootargs/initrd or final RAM map into the common DTS.
+- Preserve and account for S-Boot-injected `el2_code`, `el2_earlymem`, `kaslr` and bootargs-only carveouts; Linux 5.1 must reserve each required range exactly once.
+- The live FDT proves the composed SOVR 4.2 + stock DTBO entry 5 + S-Boot result on one SM-A505F 4-GB device only. 6-GB and other regional/model variants remain unverified until corresponding live evidence is supplied.
+- Never commit raw live DTB data or serial/IMEI-class identifiers.
+- Donor Linux 5.15 sources are comparative references only; adapt source/API/Kconfig dependencies to Linux 5.1 individually.
 
-## Blockers
-1. Locate/restore the exact A50 Exynos9610 DTS/DTSI and a matching 5.1 defconfig.
-2. Confirm whether the current 5.1 source is a clean upstream v5.1.0 base or contains additional Samsung vendor changes; record its exact base commit.
-3. Port the Exynos UFS host + Samsung UFS PHY as a coherent set, including all dependencies, rather than adding only a Kconfig symbol.
-4. Audit essential A50 platform drivers: clock/CMU/CMUCAL, regulators, pinctrl, PMU, thermal, cpufreq/devfreq, Mali, SCSC/Wi-Fi, Bluetooth, sensors, USB, display and storage.
-5. Establish exact boot image header, page size, offsets, DTB/DTBO and vendor boot requirements from the working A50 ROM before packaging.
+## Done / committed in this continuation
 
-## Next step
-- Compare the 5.1 branch's Exynos DTS directory and config directory against the known A50 donor tree. Identify exact missing files and dependency chains, then create a board-integration patch series. Do not attempt a full build until the defconfig, DTS, UFS host and UFS PHY dependencies are all present. Do not change the 4.14 main branch.
+- Re-read the complete `A50_HANDOFF_FOR_CHATGPT.md`, including evidence provenance, boot image, stock DT table, stock DTBO table, live memory map, S-Boot changes, correction list and next tasks.
+- Rechecked the active Linux 5.1 branch's actual `exynos9610.dts`, local include files, Exynos DT Makefile, upstream pinctrl implementation and Samsung clock Kconfig/Makefile.
+- Corrected the previous stale state note: the current branch DOES contain `arch/arm64/boot/dts/exynos/exynos9610.dts`, its seven immediate local DTS includes and an `exynos9610.dtb` target. It also has prior DTB smoke workflow/assertions. This is not proof of a full board integration.
+- Confirmed the current DTS retains the three static SOVR memory nodes and empty chosen bootargs/initrd placeholders.
+- Updated `EXYNOS9610_LINUX_51_INTEGRATION_PLAN.md` with Phase 21, reconciling old contradictory memory guidance and making the handoff the authoritative contract.
+- Plan update commit: `dd1a57412eeaaf86d82ec9dbcc9322185ebefbb0`.
 
+## Current implementation status
 
-## Follow-up DTS Dependency and UFS Build-Wiring Audit — 2026-11-20 07:14 +0500
+- Upstream ARM64 Linux 5.1 baseline: previously CI-verified green.
+- Exynos9610 SoC DTS and DTB build target: present; latest CI assertion result must be checked before claiming current pass.
+- Samsung stock DTBO composition: documented from supplied blobs; production stock DTBO remains external/untouched.
+- Exynos9610 pinctrl: not complete. Phase 20 EINT filter offset inconsistency remains unresolved; do not enable all six controller groups until register calculations and suspend/wake paths are validated.
+- Exynos9610 clock provider: not complete. Phase 18 dependency audit remains current; CAL/CMUCAL/provider helper closure needs a symbol/object manifest and isolated 5.1 port.
+- ACPM IPC/DVFS: not ready; keep disabled until firmware ABI, shared memory, timeout and error paths are verified.
+- UFS host + Samsung UFS PHY: absent from target 5.1 Kconfig/Kbuild as of the last audit; port together as one dependency set.
+- SysMMU, thermal, regulators, Mali, SCSC, TZDEV/TEEGRIS and remaining vendor peripherals: require per-subsystem compatibility and dependency audits.
+- A50-specific defconfig: exact current path/content still needs a fresh audit.
+- Full integrated A50 kernel compile: not yet verified.
+- Flashable package: not yet verified.
+- Hardware boot: not tested; no bootability claim.
 
-- Corrected the earlier incomplete DTS statement: `arch/arm64/boot/dts/exynos/exynos9610.dts` DOES exist and is listed as `exynos9610.dtb` in the Exynos DT Makefile. The earlier note that the SoC DTS could not be fetched was incorrect; the missing path was `exynos9610.dtsi`, which is not the included source filename used by this tree.
-- Parsed the actual `exynos9610.dts` include list and checked all seven local Exynos include files. All seven exist: `exynos9610-pinctrl.dtsi`, `exynos9610-rmem.dtsi`, `exynos9610-debug.dtsi`, `exynos9610-sysmmu.dtsi`, `exynos9610-pm-domains.dtsi`, `exynos9610-mfc.dtsi`, and `exynos9610-camera.dtsi`. This confirms the immediate local include chain exists; it is not yet a full dtc compile or proof of A50 board coverage.
-- The target Linux 5.1 `drivers/phy/samsung/Kconfig` and Makefile contain no Samsung UFS PHY option/object. Target `drivers/scsi/ufs/Makefile` has generic UFS and QCOM/HISI glue only; no Exynos host object. Target `drivers/scsi/ufs/Kconfig` has no `SCSI_UFS_EXYNOS` option. This confirms UFS support is not integrated into this branch's Kconfig/Makefile.
-- The SoC DTS includes `<dt-bindings/ufs/ufs.h>`, but this binding include alone does not provide a host controller driver or prove a matching A50 UFS node is enabled. Next inspect the UFS node, PHY node, clocks, regulators, resets, and compatible strings in the SoC DTS and donor reference before porting.
-- No source driver was copied or changed. No compile or boot result is claimed.
+## Failed / blocked
+
+1. No current evidence proves the S-Boot memory rewrite works for every 6-GB or non-F SKU; keep those as goals, not claims.
+2. Pinctrl EINT filter offset inconsistency blocks safe runtime enablement.
+3. Clock/CAL/CMUCAL dependency closure and error handling are not yet ported.
+4. ACPM firmware ABI and UFS host/PHY dependencies are not yet integrated.
+5. A DTB smoke build alone cannot validate driver binding or kernel boot.
+
+## Next step — resume here
+
+1. Inspect latest GitHub Actions run on this branch and its exact job logs/artifacts; verify the Exynos9610 DTB assertions.
+2. Continue the pinctrl EINT register-offset investigation against matching Exynos9610 hardware/vendor sources; only then implement the consistent 5.1 adaptation.
+3. Build a source/symbol/object manifest for the exact Exynos9610 clock + CAL/CMUCAL donor revision, then port the smallest compile-only closure under dedicated disabled-by-default Kconfig symbols.
+4. Keep ACPM disabled until its ABI and failure handling are proven.
+5. Port UFS host and PHY as a coherent set; compile after each isolated subsystem.
+6. Only after driver dependencies and a target defconfig are complete, run a full Linux 5.1 A50 Image + DTB build and inspect artifacts. Do not create a flashable ZIP until packaging matches the stock A50 boot/DTB partition contract.
+
+**No claim of a full kernel build, flashable package, or device boot is made by this state update.**
