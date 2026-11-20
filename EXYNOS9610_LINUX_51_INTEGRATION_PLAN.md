@@ -639,3 +639,33 @@ The complete user-supplied `A50_HANDOFF_FOR_CHATGPT.md` was reread. It is the au
 6. Then port UFS host + Samsung UFS PHY coherently, followed by SysMMU and essential board peripherals.
 7. Compile after each isolated source group; do not package or flash until a complete A50 defconfig build and artifact/boot-chain checks pass.
 
+
+
+## Phase 22 — pinctrl EINT filter-offset audit deepened (2026-11-20)
+
+The exact donor implementation was traced through the full data-to-runtime path. This resolves one ambiguity from Phase 20: the donor defines per-bank filter offsets in init data but fails to transfer them into runtime bank state, while suspend/resume continues to calculate filter registers from `2 * eint_offset`.
+
+### Exact source evidence
+
+Donor: `Vothcito/android_kernel_samsung_exynos9610_a50`, branch `exynos9610-port`.
+- `drivers/pinctrl/samsung/pinctrl-exynos-arm64.c`, blob `7fb319df272fd9155d00f8854dc1bf736d271ae1`: Exynos9610 GPIO bank macros supply both `eint_offset` and a distinct `fltcon_offset` for EINTG banks. Examples include DISPAUD gpb1 (0x04 vs 0x08), FSYS gpf2 (0x08 vs 0x0C), and TOP banks with progressively non-linear filter offsets.
+- `drivers/pinctrl/samsung/pinctrl-exynos.h`, blob `c7c2d27415a2348f9c114c3e9894a0e2c0c83275`: `EXYNOS9_PIN_BANK_EINTG/W` macros populate `fltcon_offset` in `samsung_pin_bank_data`.
+- `drivers/pinctrl/samsung/pinctrl-samsung.h`, blob `41981b11b0a2c5a1e0378e8ff41e71b6cfbaf388`: init-data struct has `fltcon_offset`, but runtime `struct samsung_pin_bank` has no corresponding member.
+- `drivers/pinctrl/samsung/pinctrl-samsung.c`, blob `6922f8a69c70590ebbd0bc41e89cb40f8ee1fa1a`: the init loop copies `eint_offset` to runtime bank but does not copy `fltcon_offset`.
+- `drivers/pinctrl/samsung/pinctrl-exynos.c`, blob `0489c899b401cf0b8ecd2b8023692d42142565df`: GPIO EINT suspend/resume reads and writes EFLTCON using `EXYNOS_GPIO_EFLTCON_OFFSET + 2 * bank->eint_offset` and the second register at +4; it never consumes the init-data `fltcon_offset`.
+
+### Consequence
+
+The donor's explicit per-bank filter offsets are currently dead init data. They do not establish the correct Exynos9610 register mapping, and the donor suspend/resume path appears internally inconsistent with its own table for banks where `fltcon_offset != 2 * eint_offset`. Do not copy these tables and assume filter support is correct. The Linux 5.1 port must not introduce a partially used field or silently choose either formula.
+
+### Required resolution before implementation
+
+1. Obtain a matching Exynos9610 register map or Samsung implementation with actual EFLTCON register addresses for ALIVE, DISPAUD, FSYS, TOP and other GPIO controllers.
+2. For every EINTG bank, independently verify CON, FLTCON0, FLTCON1, MASK and PEND addresses; verify EINTW/wakeup registers separately.
+3. Decide whether runtime state needs a distinct `fltcon_offset` and update both data-to-runtime copy and every save/restore/read/write callsite consistently if proven.
+4. Add a table-driven address test for all six controller groups and reject duplicate/out-of-range register windows.
+5. Verify suspend/resume and wake configuration paths before enabling the controller nodes.
+
+### Result
+
+This is a stronger source-level blocker, not a resolved implementation. No pinctrl code was changed or enabled. No compile or hardware test is claimed. Continue with the Exynos9610 clock/CAL dependency manifest in parallel rather than guessing the filter register map.
