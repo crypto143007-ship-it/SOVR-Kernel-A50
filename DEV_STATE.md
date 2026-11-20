@@ -209,3 +209,12 @@
 - Important: this is source-level correction only. No `bash -n`, CI run, downloaded archive, signature verification, compiler execution, kernel build, or device boot has been performed in this session. Toolchain directory must be populated with authenticated LLVM 23.1.5 before a build can proceed.
 - Current upstream kernel.org files index now also lists LLVM 23.1.6, but SOVR's explicitly selected compiler remains pinned at 23.1.5; do not auto-upgrade. kernel.org's toolchain page says the slim binaries are intended for kernel builds and that pre-5.18 kernels require PATH + `LLVM=1`; verify runtime dependencies on the actual runner.
 - Next: obtain and independently authenticate the pinned archive, provision it at `toolchain/`, run the validation workflow, and then build. Keep `main` untouched.
+
+
+## Optional Toolchain Argument Consistency — 2026-11-20
+- Found a second route to accidentally select the disallowed rolling Neutron compiler: the `-t|--toolchain` parser still defaulted its omitted value to `neutron`, even though the top-level build default was pinned to `clang_23_1_5`. This could make `build.sh --toolchain` fail the exact-version guard or select a non-pinned path.
+- Changed the optional `--toolchain` argument fallback to `clang_23_1_5`, preserving explicit user-supplied profiles while keeping the default exact-version policy consistent.
+- Added a CI source assertion for the argument fallback. Commits: `e8dbcd47e2e80ce464b1fb5cfecce8f13a85eecd` (build.sh), `702b1ffa01bda344abd2178c913f4bfb33689478` (validation workflow).
+- Verified the official kernel.org LLVM index still lists the 23.1.5 x86_64 archive and detached signature; the upstream LLVM release page recommends verifying its release package signature using LLVM release keys. Kernel.org's slim toolchain documentation notes these archives are for kernel builds, supports AArch64, and requires PATH plus `LLVM=1` for kernels predating 5.18. This supports the selected integration approach but does not authenticate an archive downloaded in this session.
+- Not yet run: `bash -n`, CI Actions run, actual archive signature check, runtime dependency check, clang/LLD invocation, kernel compilation or boot test. Main remains untouched.
+- Next: provision the verified x86_64 archive in repository-root `toolchain/`, run CI, inspect compiler/LLD output, then attempt the first A50 build. Keep exact Clang 23.1.5/LLD 23.1.5; no automatic 23.1.6 upgrade.
