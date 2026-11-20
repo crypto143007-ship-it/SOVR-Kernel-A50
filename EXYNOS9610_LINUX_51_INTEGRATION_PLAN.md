@@ -731,3 +731,26 @@ Continued the exact donor audit. No kernel source has been copied yet.
 ### Result
 
 The target branch has no existing Samsung CAL framework. The donor clock provider is deeply coupled to CAL/CMUCAL/VCLK and PMUCAL initialization, so the safe next action is a separately gated subsystem port with a complete object closure. No Kconfig/Makefile/source edits or compilation were performed in this phase; the dependency architecture is now recorded before code changes.
+
+
+## Phase 25 — CMUCAL/VCLK transitive runtime dependency audit (2026-11-20)
+
+Continued the exact donor source trace to determine whether a small clock-only compile closure exists. Result: the donor CAL/VCLK implementation is tightly coupled to ECT, ASV, ACPM and PMU/RAE paths; these are not independent compile-only data tables.
+
+### Exact donor files and findings
+
+- `drivers/soc/samsung/cal-if/cmucal.c`, blob `96913db0da1310325419d174cca210c7e0d5ad7e`: CMUCAL lookup implementation depends on the shared CMUCAL node/list structures; this file alone is comparatively narrow.
+- `drivers/soc/samsung/cal-if/vclk.c`, blob `5199f12efd2ab3f56d38188cd224d547f8fb4c56`: includes ECT parser, CMUCAL, RA, ACPM DVFS and ASV headers. It calls ECT block/DVFS/ASV lookups, CMUCAL address/node lookup, VCLK table/rate helpers and ASV initialization. Therefore the active VCLK engine cannot be built as a self-contained clock shim without resolving those interfaces.
+- `drivers/soc/samsung/cal-if/ra.c`, blob `bd9c3ea6914aad23b5db74677f12d8f9091dd5d2`: depends on ECT PLL data, Exynos PMU APIs, CMUCAL SFR mappings and low-level register-access helpers.
+- `drivers/soc/samsung/cal-if/pmucal_rae.c`, blob `0ecbd7734d55d819ac64a9c65db74261987c05ae`: PMUCAL RAE layer uses SoC-specific physical-to-virtual mapping, wait/condition/read/write sequences and SMC interfaces. This is power/firmware-sensitive and must not be stubbed as success.
+- `drivers/soc/samsung/cal-if/acpm_dvfs.h`, blob `6e4fa6dd747ad8f066ee2900a57f4db5af595550`: exposes ACPM rate/init/get/device/voltage-margin/temperature operations.
+- `drivers/soc/samsung/cal-if/asv.h`, blob `50a114069e8834c511d56d90fc49cd7e519f1af8`: ASV table initialization and group/table-version/ID queries are directly consumed by VCLK/clock policy.
+
+### Porting decision
+
+- A compile-only CMUCAL lookup object may be separable for static ID/name/address lookup, but it does not provide functional clock rate/gate operations.
+- Do not enable VCLK callbacks until ECT binary format/data, ASV tables, RA register mapping, PMUCAL/SMC behavior and ACPM firmware ABI are individually ported and tested.
+- A safe first stage should compile the provider's static clock-ID declarations and CCF registration scaffolding with all hardware-changing ops absent/disabled; it must not register fake clocks or return success for unsupported operations. Only after the full backend is ready should DT clock providers be activated.
+- The donor's CAL init sequence cannot be transplanted as-is into Linux 5.1: it initializes PMUCAL and ACPM as part of clock bring-up. Separate initialization ordering and error unwinding are mandatory.
+
+No source edits or compilation occurred. This phase narrows the safe implementation boundary; it does not claim working clocks.
