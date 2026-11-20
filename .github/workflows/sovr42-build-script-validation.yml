@@ -31,8 +31,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -Eq "clang version 23\\\\.1\\\\.5" build.sh
-          grep -Eq "LLD 23\\\\.1\\\\.5" build.sh
+          grep -Eq "clang version 23\\.1\\.5" build.sh
+          grep -Eq "LLD 23\\.1\\.5" build.sh
           test "$(grep -c 'LD=ld.lld LLVM=1' build.sh)" -ge 2
 
       - name: Verify pipefail-safe Magisk seed generation
