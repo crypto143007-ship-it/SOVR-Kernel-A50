@@ -27,6 +27,14 @@ jobs:
       - name: Validate Bash syntax
         run: bash -n build.sh
 
+      - name: Verify pinned toolchain is the default
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "BUILD_PREF_COMPILER_VERSION='clang_23_1_5'" build.sh
+          grep -Fq 'Using pinned ClangBuiltLinux 23.1.5' build.sh
+          grep -Fq 'Automatic fallback to Neutron or another compiler is disabled.' build.sh
+
       - name: Verify exact compiler and linker contract
         shell: bash
         run: |
