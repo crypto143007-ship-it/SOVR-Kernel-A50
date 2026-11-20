@@ -1,0 +1,51 @@
+name: SOVR 4.2 Build Script Validation
+
+on:
+  push:
+    branches:
+      - work/sovr42-explicit-lld
+    paths:
+      - "build.sh"
+      - ".github/workflows/sovr42-build-script-validation.yml"
+  pull_request:
+    paths:
+      - "build.sh"
+      - ".github/workflows/sovr42-build-script-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-build-script:
+    name: Validate shell syntax and SOVR build guards
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Bash syntax
+        run: bash -n build.sh
+
+      - name: Verify exact compiler and linker contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq "clang version 23\\\\.1\\\\.5" build.sh
+          grep -Eq "LLD 23\\\\.1\\\\.5" build.sh
+          test "$(grep -c 'LD=ld.lld LLVM=1' build.sh)" -ge 2
+
+      - name: Verify pipefail-safe Magisk seed generation
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -Fq "tr -dc 'a-f0-9' < /dev/urandom | head -c 16" build.sh
+          seed="$(od -An -N8 -tx1 /dev/urandom | tr -d ' \\n')"
+          [[ "$seed" =~ ^[a-f0-9]{16}$ ]]
+
+      - name: Verify stale Image protection
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'rm -f "$(pwd)/arch/arm64/boot/Image"' build.sh
+          grep -Fq 'build_kernel || {' build.sh
