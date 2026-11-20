@@ -166,29 +166,45 @@ verify_toolchain() {
 		download_toolchain
 	fi
 
-	# SOVR 4.2 requires an exact Clang/LLD pair; never accept rolling Neutron LLVM.
-		local CLANG_VERSION_OUTPUT LLD_VERSION_OUTPUT
-		if ! command -v clang >/dev/null 2>&1 || ! command -v ld.lld >/dev/null 2>&1; then
-			script_echo "E: Required clang or ld.lld executable is missing from PATH."
-			exit_script
-		fi
-		CLANG_VERSION_OUTPUT=$(clang --version 2>&1) || {
-			script_echo "E: Unable to execute clang --version."
+	# SOVR 4.2 requires one coherent LLVM 23.1.5 toolchain; never mix host LLVM tools.
+	local CLANG_VERSION_OUTPUT LLD_VERSION_OUTPUT CLANG_BIN LLD_BIN
+	if [[ "${BUILD_PREF_COMPILER_VERSION}" == 'clang_23_1_5' ]]; then
+		local REQUIRED_LLVM_TOOL
+		for REQUIRED_LLVM_TOOL in clang clang++ ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-strip; do
+			if [[ ! -x "${TOOLCHAIN_EXT}/bin/${REQUIRED_LLVM_TOOL}" ]]; then
+				script_echo "E: Pinned LLVM toolchain is incomplete: missing executable ${TOOLCHAIN_EXT}/bin/${REQUIRED_LLVM_TOOL}."
+				exit_script
+			fi
+		done
+		CLANG_BIN="${TOOLCHAIN_EXT}/bin/clang"
+		LLD_BIN="${TOOLCHAIN_EXT}/bin/ld.lld"
+	else
+		CLANG_BIN=$(command -v clang) || {
+			script_echo "E: Required clang executable is missing from PATH."
 			exit_script
 		}
-		LLD_VERSION_OUTPUT=$(ld.lld --version 2>&1) || {
-			script_echo "E: Unable to execute ld.lld --version."
+		LLD_BIN=$(command -v ld.lld) || {
+			script_echo "E: Required ld.lld executable is missing from PATH."
 			exit_script
 		}
-		if ! printf '%s\n' "${CLANG_VERSION_OUTPUT}" | grep -Eq 'clang version 23\.1\.5([[:space:]]|$)'; then
-			script_echo "E: SOVR 4.2 requires Clang 23.1.5; found: $(printf '%s\n' "${CLANG_VERSION_OUTPUT}" | sed -n '1p')"
-			exit_script
-		fi
-		if ! printf '%s\n' "${LLD_VERSION_OUTPUT}" | grep -Eq 'LLD 23\.1\.5([[:space:]]|$)'; then
-			script_echo "E: SOVR 4.2 requires LLD 23.1.5; found: $(printf '%s\n' "${LLD_VERSION_OUTPUT}" | sed -n '1p')"
-			exit_script
-		fi
-	script_echo "I: Verified required Clang 23.1.5 and LLD 23.1.5."
+	fi
+	CLANG_VERSION_OUTPUT=$("${CLANG_BIN}" --version 2>&1) || {
+		script_echo "E: Unable to execute ${CLANG_BIN} --version."
+		exit_script
+	}
+	LLD_VERSION_OUTPUT=$("${LLD_BIN}" --version 2>&1) || {
+		script_echo "E: Unable to execute ${LLD_BIN} --version."
+		exit_script
+	}
+	if ! printf '%s\n' "${CLANG_VERSION_OUTPUT}" | grep -Eq 'clang version 23\.1\.5([[:space:]]|$)'; then
+		script_echo "E: SOVR 4.2 requires Clang 23.1.5; found: $(printf '%s\n' "${CLANG_VERSION_OUTPUT}" | sed -n '1p')"
+		exit_script
+	fi
+	if ! printf '%s\n' "${LLD_VERSION_OUTPUT}" | grep -Eq 'LLD 23\.1\.5([[:space:]]|$)'; then
+		script_echo "E: SOVR 4.2 requires LLD 23.1.5; found: $(printf '%s\n' "${LLD_VERSION_OUTPUT}" | sed -n '1p')"
+		exit_script
+	fi
+	script_echo "I: Verified coherent LLVM 23.1.5 toolchain and required LLVM utilities."
 	# Proton Clang 13
 	# export CLANG_TRIPLE=aarch64-linux-gnu-
 	export CROSS_COMPILE=aarch64-linux-gnu-
