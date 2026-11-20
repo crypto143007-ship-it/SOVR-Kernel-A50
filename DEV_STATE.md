@@ -61,3 +61,17 @@ The complete user-supplied `A50_HANDOFF_FOR_CHATGPT.md` was reread on 2026-11-20
 6. Only after driver dependencies and a target defconfig are complete, run a full Linux 5.1 A50 Image + DTB build and inspect artifacts. Do not create a flashable ZIP until packaging matches the stock A50 boot/DTB partition contract.
 
 **No claim of a full kernel build, flashable package, or device boot is made by this state update.**
+
+
+## Follow-up pinctrl source trace — 2026-11-20
+
+- Deepened Phase 20 against exact donor data/runtime code and recorded Phase 22 in the integration plan.
+- Confirmed the donor Exynos9610 EINTG macros provide distinct `fltcon_offset` values (e.g. DISPAUD gpb1: eint 0x04/filter 0x08; FSYS gpf2: 0x08/0x0C; TOP entries include non-linear filter offsets).
+- Confirmed donor `samsung_pin_bank_data` contains `fltcon_offset`, but runtime `samsung_pin_bank` does not; `samsung_pinctrl.c` copies `eint_offset` only; `exynos_pinctrl.c` suspend/resume computes EFLTCON using `2 * eint_offset`. Thus the donor table's distinct filter offsets are not used by the runtime code and cannot be treated as validated hardware truth.
+- No safe register-map source has yet resolved the correct EFLTCON addresses. Pinctrl implementation remains blocked; no code was copied or enabled.
+- Updated integration plan Phase 22; commit: `3ce073923f62d565b51e9e5b59f4e329f5158bf1`.
+
+## Next
+- Continue the Exynos9610 CAL/CMUCAL/clock source-symbol manifest in parallel with the unresolved pinctrl register-map work.
+- Do not create a guessed pinctrl fix or enable the controller nodes until register addresses are independently verified.
+- Check latest Actions results separately; no new compile, DTB build, full kernel build, ZIP package, or hardware boot was run during this source audit.
