@@ -183,3 +183,11 @@
 - Workflow commits: `2b0fb56bb3cb78349c9f8cdfa18f895f9bdfea12` (initial workflow), `55e50ba25b848b45d208e480148fda150d490fba` (corrected regex/trim escaping). Re-fetched and inspected the final workflow content.
 - The workflow has been committed but its Actions run has not yet been observed. Static content inspection is not a substitute for a passing CI run. No kernel build was triggered.
 - Next: inspect the first Actions run and fix any validation failures; only then continue the pinned-toolchain provisioning and A14 One UI KSU build job.
+
+
+## Validation Workflow Review — 2026-11-20 (06:44 PKT)
+- Rechecked live branch against current `main`: experimental branch is 13 commits ahead and 0 behind; `main` HEAD is `7ed3f5ab8d0e2d35da0354e6079ecc93982d2d74`. No merge performed.
+- Found a test defect in the validation workflow's seed smoke test: the `tr -d` character set was over-escaped, so it would remove literal backslash/`n` rather than a newline. Corrected the workflow to assert the exact production command and run the smoke test with the proper newline escape.
+- Workflow correction commit: `088f9594ad1f02eb2ed98a615d793d819c5c2c6d`; workflow blob `ffe54287ec0829a22dd18feec33b63ff3b57448a`.
+- Re-fetched and inspected branch files. The validation workflow still has no observed Actions run/status; the GitHub connector exposes no workflow-run listing or dispatch action. The current main commit has no reported status checks through the connected status endpoint (empty statuses), which is not proof of a passing build.
+- Next: run the workflow in GitHub Actions and inspect the result; then perform signed LLVM 23.1.5 archive verification and runtime checks before adding toolchain provisioning or the Android 14 One UI KSU build job. Do not merge or claim kernel build success until artifacts are validated.
