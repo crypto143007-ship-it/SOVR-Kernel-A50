@@ -597,3 +597,45 @@ The Linux 5.1 target lacks the Exynos9610 bank tables, match entry and `fltcon_o
 5. Add compile-time and runtime-oriented tests that verify calculated register addresses for representative banks in each of ALIVE, CMGP, DISPAUD, FSYS, TOP and SHUB.
 
 No pinctrl implementation was copied or enabled in this phase. This finding blocks claiming the Exynos9610 pinctrl port is ready; CI's current green status only validates the upstream Image/DTB and diagnostic overlay build.
+
+
+## Phase 21 — original A50 handoff reconciled and active continuation (2026-11-20)
+
+The complete user-supplied `A50_HANDOFF_FOR_CHATGPT.md` was reread. It is the authoritative evidence record for the A50 boot-chain and SOVR 4.2 DTB contract. This phase supersedes contradictory statements in earlier phases where noted; historical findings remain historical and must not be treated as current implementation instructions.
+
+### Accepted DTB/S-Boot contract (verified from supplied blobs; SM-A505F 4 GB only)
+
+- SOVR 4.2's base `dtb.img` is a one-entry Android DT table with `custom0=0`, `custom1=0xFF`; its FDT payload declares the three static 2-GiB banks at `memory@80000000`, `memory@880000000`, and `memory@900000000`.
+- Keep this shared static three-bank placeholder. Do not create a 4-GB DTB, 6-GB DTB, per-RAM kernel fork, or hardcoded live memory map.
+- The supplied live FDT is the post-S-Boot result on one SM-A505F 4-GB unit (revision 6, stock DTBO entry 5). Exact libfdt overlay-and-compare proves the live tree is SOVR 4.2 base payload + stock DTBO entry 5 + S-Boot edits.
+- S-Boot trims/replaces memory nodes and generates bootargs. The live 4-GB layout is evidence for that one unit only; no 6-GB live dump is available. The 6-GB and other model/region claims remain target requirements, not verified claims.
+- Keep the stock DTBO partition untouched. SOVR does not ship a matching DTBO image. Samsung selection is by hardware-revision ranges [0], [1], [2], [3], [4..5], [6..0xFF], mirrored in DT table custom fields; the repository's generic board_id/board_rev diagnostic overlay is not a production Samsung DTBO.
+- Do not copy S-Boot's live /chosen bootargs/initrd or final memory edits into DTS. Preserve the S-Boot-added reserved-memory nodes (el2_code, el2_earlymem, kaslr) and bootargs-only carveout contract; Linux 5.1 must reserve each range exactly once through appropriate early/memblock handling after auditing existing reservations.
+- Preserve the distinction between stock `dt.img` and SOVR 4.2 `dtb.img`; they are different payloads. The proven live tree corresponds to SOVR's One UI 14 DTS flavor.
+- Do not commit raw `A50_live.dtb` or identifiers from live bootargs.
+
+### Current Linux 5.1 tree facts rechecked
+
+- The branch already contains `arch/arm64/boot/dts/exynos/exynos9610.dts`, seven local Exynos include files, an Exynos9610 DTB Makefile target, and a DTB smoke workflow. The previous DEV_STATE claim that the DTS/defconfig paths were simply absent was stale/inaccurate for the current tree; the exact A50-specific defconfig still needs a fresh path audit.
+- The current SoC DTS contains the three static memory banks and empty chosen bootargs/initrd placeholders, consistent with the shared SOVR static-base contract.
+- The SoC DTS includes substantial vendor peripherals and reserved-memory content. A successful DTC build only validates syntax/linkage; it does not prove those drivers are implemented, safe to enable, or bootable.
+- Linux 5.1 clock/CAL/CMUCAL/ACPM integration is not complete. Phase 18 remains the latest clock dependency audit; no clock provider runtime support is claimed.
+- Phase 20's EINT filter offset inconsistency remains an unresolved pinctrl blocker. Do not mechanically import/enable the six pinctrl controller groups until the address calculation and suspend/wake paths are resolved.
+- The target branch's generic UFS host and Samsung UFS PHY integration is still absent per the 2026-11-20 audit; donor Linux 5.15 source is reference-only until individually adapted to 5.1.
+
+### Build/boot status boundary
+
+- Generic upstream ARM64 Linux 5.1 baseline CI was previously green.
+- Exynos9610 DTB smoke assertions and diagnostic overlay checks have been added in earlier phases; check the latest Actions run and artifacts before reporting their current status.
+- No integrated Linux 5.1 A50 kernel, complete vendor driver set, flashable ZIP, or hardware boot has been proven by this handoff. Do not call the current result a bootable kernel.
+
+### Next work (resume here; do not repeat completed audits)
+
+1. Refresh current branch tip and latest Actions run; inspect exact logs/artifact and determine whether the explicit Exynos9610 DTB assertions pass.
+2. Keep the shared three-bank SOVR base DTB and stock DTBO selection contract unchanged.
+3. Continue the pinctrl EINT offset/register-map investigation, then adapt the Linux 5.1 runtime structures and save/restore paths only when evidence resolves it.
+4. In parallel, produce a symbol/object dependency manifest for the exact Exynos9610 CAL/CMUCAL clock provider donor revision; port the minimal compile-only dependency closure behind dedicated disabled-by-default Kconfig symbols.
+5. Keep ACPM/firmware IPC disabled until its ABI, shared-memory layout, timeout and error-unwind paths are verified.
+6. Then port UFS host + Samsung UFS PHY coherently, followed by SysMMU and essential board peripherals.
+7. Compile after each isolated source group; do not package or flash until a complete A50 defconfig build and artifact/boot-chain checks pass.
+
