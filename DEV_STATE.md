@@ -75,3 +75,16 @@ The complete user-supplied `A50_HANDOFF_FOR_CHATGPT.md` was reread on 2026-11-20
 - Continue the Exynos9610 CAL/CMUCAL/clock source-symbol manifest in parallel with the unresolved pinctrl register-map work.
 - Do not create a guessed pinctrl fix or enable the controller nodes until register addresses are independently verified.
 - Check latest Actions results separately; no new compile, DTB build, full kernel build, ZIP package, or hardware boot was run during this source audit.
+
+
+## Follow-up CAL/CMUCAL dependency trace — 2026-11-20
+
+- Started Phase 23 in the integration plan using exact donor blobs from `Vothcito/android_kernel_samsung_exynos9610_a50:exynos9610-port`.
+- Clock driver direct dependency set includes CAL init/rate calls, Samsung composite clock extensions, and Exynos9610 CMUCAL VCLK/node/QCH/clockout headers.
+- Found a concrete donor API/configuration inconsistency: normal `cal-if.h` declares `cal_if_init(void *)`, while the `CONFIG_PWRCAL` inline stub declares `cal_if_init(void)`; the Exynos9610 clock driver calls `cal_if_init(np)`. The no-op stub is not a valid substitute for initialized CAL. Resolve before compile/enablement.
+- Donor CAL implementation pulls in CMUCAL, PMUCAL, ACPM_DVFS, FVMAP, ASV and ECT interfaces; porting only `clk-exynos9610.c` would be incomplete. No source copied or compiled.
+- Integration plan Phase 23 commit: `eae2b78280056574cd45af5462568544212f6a3d`.
+
+## Next
+- Continue exact symbol-to-object mapping for CMUCAL, VCLK/QCH tables and CAL data; identify the minimum Linux 5.1 compile closure without accidentally enabling ACPM or unsupported power paths.
+- Keep pinctrl blocked on the verified EFLTCON register map. Keep clock provider disabled until CAL interface/API and failure handling are corrected.
