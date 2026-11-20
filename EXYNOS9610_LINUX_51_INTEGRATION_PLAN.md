@@ -697,3 +697,37 @@ Started the exact-revision dependency manifest for donor branch `Vothcito/androi
 5. Compile the smallest isolated object set against Linux 5.1 before linking/registering the Exynos9610 provider. Do not carry panic-on-failure init behaviour into the experimental port.
 
 No CAL/CMUCAL/clock source was changed, no compile was run, and no provider runtime or boot success is claimed.
+
+
+## Phase 24 — donor clock object closure and safe Kconfig boundary (2026-11-20)
+
+Continued the exact donor audit. No kernel source has been copied yet.
+
+### Target Linux 5.1 integration points
+
+- Target `drivers/clk/samsung/Kconfig` only has the generic `EXYNOS_ARM64_COMMON_CLK` symbol for Exynos ARM64 clock support. It selects the broad ARM64 provider group and is not a safe way to add an unported Exynos9610 Samsung CAL provider.
+- Target `drivers/clk/samsung/Makefile` currently builds the upstream ARM64 clock drivers and has no dedicated Exynos9610 object or dedicated CAL extension symbol.
+- Target `drivers/soc/samsung/Kconfig` and Makefile contain only upstream PMU/PM-domain drivers; there is no Samsung CAL_IF / CMUCAL integration.
+- Therefore the donor's use of `CONFIG_EXYNOS_ARM64_COMMON_CLK` to compile `composite.o` and `clk-exynos9610.o` is too broad for this Linux 5.1 branch and must not be copied as-is.
+
+### Donor object closure is larger than first estimated
+
+- Donor `drivers/clk/samsung/composite.c` (blob `3cf4a6dd71fdb4c098db392869022bdd7593c633`) implements VCLK operations whose callbacks call CAL/VCLK APIs at runtime: enable/disable, is_enabled, recalc_rate, round_rate, set_rate, DFS rate changes, and QCH initialization. A clock-provider compile cannot be considered harmless just because the provider itself is not selected by the board DT.
+- Donor `drivers/soc/samsung/cal-if/Makefile` (blob `00944ace1b772acd0193edf80792dd7b884e4c0a`) unconditionally includes `cal-if.o` in that directory; CMUCAL selects `cmucal.o ra.o vclk.o pll_spec.o`; PMUCAL selects system/local/CPU/RAE; ACPM_DVFS selects `acpm_dvfs.o fvmap.o`; Exynos9610 selects `exynos9610/cal_data.o`.
+- Donor `exynos9610/cal_data.c` (blob `fb578d3120abe11723345ad2162b9056cde18e99`) textually includes `cmucal-node.c`, `cmucal-qch.c`, `cmucal-sfr.c`, `cmucal-vclk.c`, `cmucal-vclklut.c`, and `clkout_exynos9610.c`, as well as broad PMUCAL and ACPM/ASV headers. It is a monolithic data/implementation compilation unit with additional PMUCAL references, not merely static clock-ID tables.
+- Donor `cmucal-vclk.h`, `cmucal-node.h`, and `cmucal-qch.h` all include the shared `../cmucal.h` and expose a large Exynos9610-specific ID namespace. The header `vclk.h` returns success from many CONFIG_CMUCAL-disabled inline stubs, which could mask a missing clock backend if selected accidentally.
+- The donor `cal-if.c` initialization path calls ECT parsing, VCLK initialization, PMUCAL RAE/system/local/CPU initialization and then ACPM device setup. It is not a minimal CAL shim and cannot be enabled until every dependency and side effect is understood.
+
+### Safe architecture for the first Linux 5.1 port
+
+1. Add a dedicated `CONFIG_EXYNOS9610_SAMSUNG_CLK` (or similarly scoped) option, depending on `ARCH_EXYNOS && ARM64 && COMMON_CLK`, default off. Do not select it from the generic ARM64 clock symbol.
+2. Keep the experimental provider object and Samsung composite extension behind that dedicated option; keep the board DTS clock consumers disabled until providers are complete.
+3. Split the CAL core, CMUCAL ID/data, PMUCAL, ACPM and ASV dependencies only after symbol/object analysis; do not pull the entire donor `cal_data.c` into a first compile-only test without verifying its transitive PMUCAL/ACPM symbols and data tables.
+4. Replace success-returning disabled stubs for mandatory clock operations with explicit build-time dependency or `-ENODEV`/error propagation. Never let a provider register when its CAL backend is absent.
+5. Resolve `cal_if_init(void *)` signature consistently across real implementation and disabled stubs; propagate initialization failure rather than continuing with a partially initialized clock tree.
+6. Compare Samsung `composite.c` API and data structures against Linux 5.1 CCF APIs before attempting compilation. The file is 46,911 bytes and is not a small header-only compatibility addition.
+7. Keep ACPM/DVFS and PMUCAL power sequencing disabled in the first isolated compile unless the selected VCLK operations require them; if required, port the full dependency closure rather than stubbing them.
+
+### Result
+
+The target branch has no existing Samsung CAL framework. The donor clock provider is deeply coupled to CAL/CMUCAL/VCLK and PMUCAL initialization, so the safe next action is a separately gated subsystem port with a complete object closure. No Kconfig/Makefile/source edits or compilation were performed in this phase; the dependency architecture is now recorded before code changes.
