@@ -70,10 +70,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          grep -Fxq 'CONFIG_LD_LLD=y' arch/arm64/configs/exynos9610-a50_core_defconfig
           grep -Fxq 'CONFIG_LTO_CLANG=y' arch/arm64/configs/exynos9610-a50_core_defconfig
           grep -Fxq 'CONFIG_THINLTO=y' arch/arm64/configs/exynos9610-a50_core_defconfig
-          grep -Fq 'lto-clang-flags := -flto=thin' Makefile || grep -Fq 'lto-clang-flags' Makefile
-          grep -Fq 'lto-clang-flags' Makefile
+          grep -Fq -- '-flto=thin' Makefile
           grep -Fq 'LD=ld.lld LLVM=1' build.sh
           echo "A50 core config enables Clang ThinLTO; Makefile contains ThinLTO implementation."
 
