@@ -103,3 +103,16 @@ The complete user-supplied `A50_HANDOFF_FOR_CHATGPT.md` was reread on 2026-11-20
 - Define the minimal mandatory CAL/CMUCAL/VCLK symbol closure and split out any safe static ID/data-only parts from PMUCAL/ACPM runtime code.
 - Implement a dedicated disabled-by-default Exynos9610 Samsung clock option only after the source closure is verified; do not select via generic ARM64 clock support.
 - Keep pinctrl blocked on EFLTCON register proof. Keep full board clock consumers disabled until provider init and error paths are valid.
+
+
+## Follow-up CMUCAL/VCLK transitive audit — 2026-11-20
+
+- Recorded Phase 25 in `EXYNOS9610_LINUX_51_INTEGRATION_PLAN.md`; commit `360e519fdde78d2010622f1b15172acbb48a25a3`.
+- Exact donor VCLK engine (`vclk.c`) directly depends on ECT parser, CMUCAL, RA, ACPM DVFS and ASV; it calls ECT DVFS/ASV data, CMUCAL lookup, VCLK rate tables and ASV initialization. It is not a self-contained clock helper.
+- Donor RA layer uses ECT PLL data, Exynos PMU and CMUCAL SFR mappings. PMUCAL RAE uses SoC physical/virtual mapping, sequenced register operations and SMC calls. These are firmware/power-sensitive dependencies, not safe stubs.
+- Conclusion: only static clock ID/lookup compilation may be independently isolated. Do not activate VCLK CCF callbacks or expose DT clock providers until ECT, ASV, RA/PMUCAL, ACPM ABI and init/error ordering are ported and validated.
+- No source edits or compile performed; no clock provider is functional yet.
+
+## Next
+- Audit Linux 5.1 upstream ECT parser and PMU API compatibility, then map the ECT data/binary source contract from the exact Samsung donor and device vendor artifacts.
+- Keep first-stage work to compile-only static ID/CCF scaffolding with hardware ops disabled; no fake success stubs and no DT consumer activation.
