@@ -28,3 +28,12 @@
 
 ## Next step
 - Compare the 5.1 branch's Exynos DTS directory and config directory against the known A50 donor tree. Identify exact missing files and dependency chains, then create a board-integration patch series. Do not attempt a full build until the defconfig, DTS, UFS host and UFS PHY dependencies are all present. Do not change the 4.14 main branch.
+
+
+## Follow-up DTS Dependency and UFS Build-Wiring Audit — 2026-11-20 07:14 +0500
+
+- Corrected the earlier incomplete DTS statement: `arch/arm64/boot/dts/exynos/exynos9610.dts` DOES exist and is listed as `exynos9610.dtb` in the Exynos DT Makefile. The earlier note that the SoC DTS could not be fetched was incorrect; the missing path was `exynos9610.dtsi`, which is not the included source filename used by this tree.
+- Parsed the actual `exynos9610.dts` include list and checked all seven local Exynos include files. All seven exist: `exynos9610-pinctrl.dtsi`, `exynos9610-rmem.dtsi`, `exynos9610-debug.dtsi`, `exynos9610-sysmmu.dtsi`, `exynos9610-pm-domains.dtsi`, `exynos9610-mfc.dtsi`, and `exynos9610-camera.dtsi`. This confirms the immediate local include chain exists; it is not yet a full dtc compile or proof of A50 board coverage.
+- The target Linux 5.1 `drivers/phy/samsung/Kconfig` and Makefile contain no Samsung UFS PHY option/object. Target `drivers/scsi/ufs/Makefile` has generic UFS and QCOM/HISI glue only; no Exynos host object. Target `drivers/scsi/ufs/Kconfig` has no `SCSI_UFS_EXYNOS` option. This confirms UFS support is not integrated into this branch's Kconfig/Makefile.
+- The SoC DTS includes `<dt-bindings/ufs/ufs.h>`, but this binding include alone does not provide a host controller driver or prove a matching A50 UFS node is enabled. Next inspect the UFS node, PHY node, clocks, regulators, resets, and compatible strings in the SoC DTS and donor reference before porting.
+- No source driver was copied or changed. No compile or boot result is claimed.
