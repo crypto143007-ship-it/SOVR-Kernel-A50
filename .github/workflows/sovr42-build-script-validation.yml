@@ -54,6 +54,14 @@ jobs:
           grep -Fq 'Pinned LLVM toolchain is incomplete' build.sh
           grep -Fq 'Verified coherent LLVM 23.1.5 toolchain' build.sh
 
+      - name: Verify pinned LLVM tools are passed to kernel make
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'HOSTCC="\${CCACHE}clang" HOSTCXX="\${CCACHE}clang++" LD=ld.lld LLVM=1 AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip' build.sh
+          test "$(grep -c 'LD=ld.lld LLVM=1 AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip' build.sh)" -ge 2
+          grep -Fq 'export PATH="\${TOOLCHAIN_EXT}/bin:$PATH"' build.sh
+
       - name: Verify pipefail-safe Magisk seed generation
         shell: bash
         run: |
