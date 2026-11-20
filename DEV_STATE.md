@@ -88,3 +88,18 @@ The complete user-supplied `A50_HANDOFF_FOR_CHATGPT.md` was reread on 2026-11-20
 ## Next
 - Continue exact symbol-to-object mapping for CMUCAL, VCLK/QCH tables and CAL data; identify the minimum Linux 5.1 compile closure without accidentally enabling ACPM or unsupported power paths.
 - Keep pinctrl blocked on the verified EFLTCON register map. Keep clock provider disabled until CAL interface/API and failure handling are corrected.
+
+
+## Follow-up clock-port boundary audit — 2026-11-20
+
+- Recorded Phase 24 in `EXYNOS9610_LINUX_51_INTEGRATION_PLAN.md`; commit `372aa9cd22141589d5db252d83892ddbce28f798`.
+- Rechecked current target Linux 5.1 Samsung clock and SoC Kconfig/Makefiles: there is no Exynos9610 provider or Samsung CAL framework; the generic `EXYNOS_ARM64_COMMON_CLK` symbol is too broad for importing the vendor provider.
+- Donor `composite.c` supplies live VCLK CCF callbacks that call CAL APIs, so it is runtime-coupled, not a compile-only harmless extension.
+- Donor Exynos9610 `cal_data.c` textually includes CMUCAL node/QCH/SFR/VCLK/LUT and clockout implementation C files and also references broad PMUCAL/ACPM/ASV headers. Do not blindly compile this monolithic unit or enable the donor's generic ARM64 clock symbol.
+- Donor CAL init invokes ECT parsing, VCLK init, PMUCAL RAE/system/local/CPU init, and ACPM setup. The subsystem requires an explicit dependency boundary and real failure propagation.
+- No kernel source/Kconfig/Makefile change or compile was made; this remains a source-level design audit.
+
+## Next
+- Define the minimal mandatory CAL/CMUCAL/VCLK symbol closure and split out any safe static ID/data-only parts from PMUCAL/ACPM runtime code.
+- Implement a dedicated disabled-by-default Exynos9610 Samsung clock option only after the source closure is verified; do not select via generic ARM64 clock support.
+- Keep pinctrl blocked on EFLTCON register proof. Keep full board clock consumers disabled until provider init and error paths are valid.
