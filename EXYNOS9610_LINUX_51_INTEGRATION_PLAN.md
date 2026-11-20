@@ -669,3 +669,31 @@ The donor's explicit per-bank filter offsets are currently dead init data. They 
 ### Result
 
 This is a stronger source-level blocker, not a resolved implementation. No pinctrl code was changed or enabled. No compile or hardware test is claimed. Continue with the Exynos9610 clock/CAL dependency manifest in parallel rather than guessing the filter register map.
+
+
+## Phase 23 — CAL/CMUCAL clock dependency manifest: first API blockers (2026-11-20)
+
+Started the exact-revision dependency manifest for donor branch `Vothcito/android_kernel_samsung_exynos9610_a50:exynos9610-port`. This is a source audit only; no donor code was copied.
+
+### Clock-provider entry point
+
+- `drivers/clk/samsung/clk-exynos9610.c`, blob `dcd2d2f8c85fa1f741db0beb5d70b7dc21138579`, includes the Linux Common Clock Framework, `<soc/samsung/cal-if.h>`, Exynos9610 `cmucal-vclk.h`, `cmucal-node.h`, `cmucal-qch.h`, `clkout_exynos9610.h`, and Samsung `composite.h`.
+- Direct CAL calls found in the driver include `cal_if_init(np)` and `cal_clk_setrate(...)`; provider registration uses Samsung-specific helpers including `samsung_register_of_fixed_ext`, `samsung_register_vclk`, and `samsung_clk_of_add_provider`.
+- `drivers/clk/samsung/composite.c` is a substantial Samsung extension and includes `<soc/samsung/cal-if.h>`; it is not equivalent to the upstream v5.1 generic Samsung clock helpers.
+
+### Concrete API/configuration inconsistency in donor revision
+
+- `include/soc/samsung/cal-if.h`, blob `65fe05a30e4251b0ca9d735ddbb29d7713374ac5`, declares `cal_if_init(void *)` in the normal CAL path, but the `CONFIG_PWRCAL` inline stub declares `cal_if_init(void)` and returns success without doing initialization.
+- The Exynos9610 clock driver calls `cal_if_init(np)`. Therefore a build selecting `CONFIG_PWRCAL` against this exact header has a prototype mismatch; the no-op stub must not be mistaken for a valid initialized CAL provider. Configuration selection and the intended CAL implementation must be resolved before compiling/enabling the provider.
+- The same header's non-PWRCAL path includes the large `pmucal_system.h` interface and exposes broad CAL/PMUCAL APIs. The donor `cal-if/cal-if.c` includes CMUCAL, PMUCAL, ACPM DVFS, FVMAP, ASV and ECT parser interfaces. The object closure is substantially larger than a single clock driver.
+- Donor `drivers/soc/samsung/cal-if/Makefile` selects `cal-if.o` unconditionally under CAL_IF, and gates CMUCAL, PMUCAL, ACPM_DVFS and Exynos9610 `cal_data.o` separately. This is a dependency map only; it is not a Linux 5.1-ready Kconfig design.
+
+### Porting gate
+
+1. Resolve the `CONFIG_PWRCAL` vs normal CAL interface contract and eliminate any success-returning no-op path for required clock initialization.
+2. Map every required CAL/CMUCAL symbol to its defining object and all transitive headers/data from this exact donor revision.
+3. Compare all Samsung composite helper types/functions with upstream Linux 5.1 APIs; keep the new provider behind dedicated disabled-by-default symbols.
+4. Keep ACPM DVFS and firmware IPC out of the first compile closure unless a referenced symbol demonstrably requires it.
+5. Compile the smallest isolated object set against Linux 5.1 before linking/registering the Exynos9610 provider. Do not carry panic-on-failure init behaviour into the experimental port.
+
+No CAL/CMUCAL/clock source was changed, no compile was run, and no provider runtime or boot success is claimed.
