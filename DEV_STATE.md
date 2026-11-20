@@ -218,3 +218,14 @@
 - Verified the official kernel.org LLVM index still lists the 23.1.5 x86_64 archive and detached signature; the upstream LLVM release page recommends verifying its release package signature using LLVM release keys. Kernel.org's slim toolchain documentation notes these archives are for kernel builds, supports AArch64, and requires PATH plus `LLVM=1` for kernels predating 5.18. This supports the selected integration approach but does not authenticate an archive downloaded in this session.
 - Not yet run: `bash -n`, CI Actions run, actual archive signature check, runtime dependency check, clang/LLD invocation, kernel compilation or boot test. Main remains untouched.
 - Next: provision the verified x86_64 archive in repository-root `toolchain/`, run CI, inspect compiler/LLD output, then attempt the first A50 build. Keep exact Clang 23.1.5/LLD 23.1.5; no automatic 23.1.6 upgrade.
+
+
+## Pinned LLVM Toolchain Consistency — 2026-11-20
+- Re-audited the full verify_toolchain() implementation. The existing gate already checked that resolved clang --version and ld.lld --version report exactly 23.1.5; no duplicate version gate was needed.
+- Found a narrower integrity gap: the pinned profile only checked for clang and ld.lld files, while the kernel build also invokes clang++, llvm-ar, llvm-nm, llvm-objcopy, llvm-objdump, and llvm-strip. Because these are resolved through PATH, an incomplete pinned archive could silently mix in host LLVM utilities.
+- Updated build.sh so the clang_23_1_5 profile requires all eight executables in toolchain/bin, and obtains the version strings from the pinned absolute paths for clang and ld.lld. Missing tools now fail closed before make starts. Other explicitly selected profiles remain subject to the existing exact Clang/LLD version contract.
+- Code commit: 47536508108e3dfb1ce059afc73fd7c46ed329e0 (fix: require a coherent pinned LLVM toolchain).
+- Extended .github/workflows/sovr42-build-script-validation.yml with source assertions for the complete tool list, absolute pinned compiler/linker paths, and fail-closed error. Workflow commit: 104ab14eb98775600f06660018db974adfc55af4.
+- Re-fetched both committed files after writing. Not yet run: bash -n, mocked missing-tool/version tests, GitHub Actions validation, actual LLVM executable checks, kernel compile, package validation, or device boot. The workflow source assertions are not a passing CI result.
+- Toolchain provisioning remains blocked on independent authentication of the kernel.org LLVM 23.1.5 archive/signing key and runtime dependency validation. No compiler archive was installed and no alternate LLVM version was substituted.
+- Next: inspect the validation workflow's Actions result when available; authenticate and test the exact LLVM 23.1.5 archive on a disposable runner; then add the Android 14 One UI KSU build job only after the toolchain and boot metadata are verified. Keep main untouched.
