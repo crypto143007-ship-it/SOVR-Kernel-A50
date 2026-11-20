@@ -175,3 +175,11 @@
 - Commit: `eab3233ca8339b7b711f731d3a7c93a8da6a22db`; new `build.sh` blob: `9553a67ac9ccfa211d46be141a1150395c2ef8af`. Re-fetched the file and verified the replacement block.
 - Not yet run: `bash -n`, execution with `/dev/urandom` mocks, full build, packaging, or device test. No compile success is claimed.
 - Next: add/run automated shell regression tests for the seed helper and exact compiler/linker gate on a runner; then verify and provision the immutable ClangBuiltLinux 23.1.5 toolchain before A14 One UI KSU CI.
+
+
+## Automated Build-Script Validation CI — 2026-11-20
+- Added `.github/workflows/sovr42-build-script-validation.yml` on the isolated work branch. It runs on branch pushes affecting `build.sh`/the workflow, pull requests, and manual dispatch.
+- The job checks `bash -n build.sh`, asserts the exact Clang 23.1.5 / LLD 23.1.5 gate and explicit `LD=ld.lld LLVM=1` make arguments, exercises the finite random-seed formatting pipeline, and checks stale-Image removal/compile-abort guards.
+- Workflow commits: `2b0fb56bb3cb78349c9f8cdfa18f895f9bdfea12` (initial workflow), `55e50ba25b848b45d208e480148fda150d490fba` (corrected regex/trim escaping). Re-fetched and inspected the final workflow content.
+- The workflow has been committed but its Actions run has not yet been observed. Static content inspection is not a substitute for a passing CI run. No kernel build was triggered.
+- Next: inspect the first Actions run and fix any validation failures; only then continue the pinned-toolchain provisioning and A14 One UI KSU build job.
