@@ -213,7 +213,16 @@ fill_magisk_config() {
 
 	# Create a unique random seed per-build
 	script_echo "   - Generating a unique random seed for this build..."
-	RANDOMSEED=$(tr -dc 'a-f0-9' < /dev/urandom | head -c 16)
+	# Read a finite 8-byte seed before formatting; avoid head closing a pipe early
+	# under the script-wide pipefail setting.
+	RANDOMSEED=$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n') || {
+		script_echo "E: Unable to generate Magisk random seed."
+		return 1
+	}
+	if [[ ! ${RANDOMSEED} =~ ^[a-f0-9]{16}$ ]]; then
+		script_echo "E: Generated Magisk random seed has an invalid format."
+		return 1
+	fi
 	echo "RANDOMSEED=0x$RANDOMSEED" >> "$MAGISK_USR_DIR/backup_magisk"
 }
 
